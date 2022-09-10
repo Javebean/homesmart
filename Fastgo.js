@@ -14,7 +14,7 @@
 
 (function() {
     'use strict';
-     //create desc
+     //create desc div
     let createDesc = function (descri) {
         const desc = document.createElement('span');
         desc.innerHTML=descri;
@@ -22,6 +22,7 @@
         return desc;
     }
 
+    // create whole container div
     let createFastContainer = function () {
         let container = document.querySelector("body header div.container div.fastgo-container")
         if(!container){
@@ -33,21 +34,21 @@
         return container;
     }
 
-     //创建快捷菜单
+     //create every row contain desc label and item buttons
     let createLinkButton = function (arr,desc) {
         let container = createFastContainer();
-        let itemDiv = document.createElement('div');
-        itemDiv.classList.add("fastgo-item");
+        let rowDiv = document.createElement('div');
+        rowDiv.classList.add("fastgo-row");
             //body > header > div > div
-        $(container).append(itemDiv);
-        $(itemDiv).append(createDesc(desc));
+        $(container).append(rowDiv);
+        $(rowDiv).append(createDesc(desc));
         for (var v of arr) {
             const button = document.createElement('a');
-            button.innerHTML=v.name+"（"+v.times+"）";
+            button.innerHTML=v.name+"("+v.times+")";
             button.href = v.url;
             button.classList.add("fastgo0820");
             //body > header > div > div
-            $(itemDiv).append(button);
+            $(rowDiv).append(button);
         }
     }
 
@@ -77,7 +78,7 @@
     }
 
     //得到当前页标题
-    let getVisitedKey = function(){
+    let     getVisitedKey = function(){
         let active = document.querySelectorAll("body > div > div.main-left > ul > li > ul > li.active")
         //console.log(active.length)
         if(active.length>1){
@@ -148,18 +149,30 @@
         createLinkButton(visitedData,"最多访问>> ");
 
     }
-     loadPage()
+    loadPage()
 
 
     let css=`
+      div.container,div.fastgo-container {
+        height:100%;
+      }
+      div.fastgo-container {
+        display: -webkit-flex; /* Safari */
+        display: flex;
+        flex-direction:column;
+        justify-content:center;
+      }
+
       .fastgo0820 {
         background-color: #4CAF50; /* Green */
         border: none;
+        border-radius:4px;
         color: white;
         text-align: center;
         text-decoration: none;
         display: inline-block;
-        margin:0 2px
+        margin:2px 4px;
+        padding:1px 5px;
       }
     `
     GM_addStyle(css)
