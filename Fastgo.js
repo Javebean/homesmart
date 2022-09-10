@@ -14,6 +14,9 @@
 
 (function() {
     'use strict';
+
+    let ITEM_COUNT = 5;
+
      //create desc div
     let createDesc = function (descri) {
         const desc = document.createElement('span');
@@ -77,16 +80,26 @@
         }
     }
 
-    //得到当前页标题
-    let     getVisitedKey = function(){
-        let active = document.querySelectorAll("body > div > div.main-left > ul > li > ul > li.active")
-        //console.log(active.length)
+    // get active meau
+    let   getVisitedKey = function(){
+        let meauTitle = document.querySelectorAll("body > div > div.main-left > ul > li > .menu.active")
+        let active = document.querySelectorAll("body > div > div.main-left > ul > li > ul > li.active");
+        console.log(meauTitle)
+        let clickName;
+        let menuName;
+        if(meauTitle.length != 1){
+            let paths = getCurUrl().split("/");
+            menuName = paths[paths.length-2];
+        }else{
+            menuName = meauTitle[0].innerText;
+        }
         if(active.length>1){
             let paths = getCurUrl().split("/");
-            return paths[paths.length-1];
+            clickName = paths[paths.length-1];
+        }else{
+            clickName = active[0].innerText;
         }
-        let docTitle = active[0].innerText;
-        return docTitle;
+        return menuName+"-"+clickName;
     }
 
       //记录每页数据被访问次数
@@ -128,7 +141,7 @@
                 arr.splice(index, 1);
                 arr.splice(0,0,item);
             } else{
-                if(arr.length > 10){
+                if(arr.length > ITEM_COUNT){
                     arr.pop();
                 }
                 arr.unshift(defaultVisitedData);
@@ -151,7 +164,7 @@
     }
     loadPage()
 
-
+    //openwrt's container in head must set height 100%
     let css=`
       div.container,div.fastgo-container {
         height:100%;
@@ -161,6 +174,7 @@
         display: flex;
         flex-direction:column;
         justify-content:center;
+        font-size:10px;
       }
 
       .fastgo0820 {
