@@ -88,9 +88,8 @@
         if (!rightRow) {
             rightRow = document.createElement('div');
             rightRow.classList.add("opnav-right-row1");
+            rightRow.classList.add("opnav-right-row");
         }
-        // const rightRow = document.createElement('div');
-        // rightRow.classList.add("opnav-right-row1");
         return rightRow;
     }
 
@@ -100,9 +99,8 @@
         if (!rightRow) {
             rightRow = document.createElement('div');
             rightRow.classList.add("opnav-right-row2");
+            rightRow.classList.add("opnav-right-row");
         }
-        // const rightRow = document.createElement('div');
-        // rightRow.classList.add("opnav-right-row1");
         return rightRow;
     }
 
@@ -115,7 +113,7 @@
     }
 
     // 拼装基本组件
-    let initBaseComponents = function () {
+    function initBaseComponents() {
         let container = createOpNavContainer();
         let searchCon = createSearchContainer();
         let searchBar = createSearchBar();
@@ -123,7 +121,7 @@
         let rightRow1 = createRightRow1();
         let rightRow2 = createRightRow2();
         // 组装
-        let op_container = document.querySelector("body header div.container")
+        let op_container = document.querySelector("body header div.container");
         $(op_container).append(container);
 
         $(container).append(searchCon);
@@ -150,8 +148,15 @@
             }
             createSearchOptions(options);
         });
-    }();
+    };
 
+    let isLoginIn = function () {
+        let input_pwd = document.querySelector('input[type="password"]');
+        // console.log(input_pwd);
+        if (!input_pwd) {
+            initBaseComponents();
+        }
+    }();
 
 
     //create every row contain desc label and item buttons
@@ -291,28 +296,38 @@
 
     //openwrt's container in head must set height 100%
     let css = `
-      div.container,div.opnav-container {
-        height:100%;
-      }
-      div.opnav-container {
-        display: -webkit-flex; /* Safari */
-        display: flex;
-        justify-content: flex-start;
-        align-items: center;
-        font-size:10px;
-      }
+        div.container,div.opnav-container {
+            height:100%;
+        }
 
-      .opnav-link-item {
-        background-color: #4CAF50; /* Green */
-        border: none;
-        border-radius:4px;
-        color: white;
-        text-align: center;
-        text-decoration: none;
-        display: inline-block;
-        margin:2px 4px;
-        padding:1px 5px;
-      }
+        div.opnav-container {
+            display: -webkit-flex; /* Safari */
+            display: flex;
+            justify-content: flex-start;
+            align-items: center;
+            font-size:10px;
+        }
+
+        .opnav-right-container{
+            width:100%;
+            overflow-x: scroll;
+        }
+
+        .opnav-right-row {
+            width: 800px;
+        }
+
+        .opnav-link-item {
+            background-color: #4CAF50; /* Green */
+            border: none;
+            border-radius:4px;
+            color: white;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            margin:2px 4px;
+            padding:1px 5px;
+        }
     `
     GM_addStyle(css)
 
