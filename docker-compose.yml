@@ -1,0 +1,34 @@
+version: "2.1"
+
+services:
+  web:
+    image: whyour/qinglong:2.12.1
+    volumes:
+      - /mnt/mmcblk2p4/ql/data:/ql/data
+    ports:
+      - "0.0.0.0:5700:5700"
+    restart: unless-stopped
+
+  qbittorrent:
+    image: lscr.io/linuxserver/qbittorrent:latest
+    container_name: qbittorrent
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Asia/Shanghai
+      - WEBUI_PORT=8081
+    volumes:
+      #- /mnt/mmcblk2p4/tempBTDown/qb/config:/config
+      #- /mnt/mmcblk2p4/tempBTDown/qb/downloads:/downloads
+      - /mnt/sda1/qb/config:/config
+      - /mnt/sda1/qb/downloads:/downloads
+    ports:
+      - 8081:8081
+      - 52100:52100
+      - 52100:52100/udp
+    restart: unless-stopped
+
+networks:
+  default:
+    # Use a custom driver
+    driver: mydockercompose_default
