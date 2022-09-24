@@ -125,6 +125,7 @@
         return tb;
     }
 
+    //
     function checkPasswallNode() {
         $("button.opnav-check-used").click(function () {
             let ckBts = document.querySelectorAll('input[type="button"][value="可用性测试"].cbi-button');
