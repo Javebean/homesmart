@@ -248,12 +248,21 @@
     // get active meau
     let getVisitedKey = function () {
         let curUrl = Util.getCurUrl();
+        if (!curUrl.endsWith('/')) {
+            curUrl += '/';
+        }
+        console.log(curUrl);
 
         let menuLi = document.querySelectorAll("ul.slide-menu li a");
         var liArr = [...menuLi]; // converts NodeList to Array
         liArr.forEach(e => {
-            if (curUrl.endsWith($(e).attr('href'))) {
-                // console.log(e);
+            let itemUrl = $(e).attr('href').toLowerCase();
+            if (!itemUrl.endsWith('/')) {
+                itemUrl += '/';
+            }
+
+            if (curUrl.indexOf(itemUrl) > -1) {
+                console.log(curUrl, e);
                 $(e).parent().addClass('active');
                 $(e).parent().parent().addClass('active').css({ 'display': 'block' });
                 // $(e).parent().parent().prev().addClass('active');
@@ -275,6 +284,8 @@
         } else {
             menuName = meauTitle[0].innerText;
         }
+        console.log(active);
+
         if (active.length > 1) {
             let paths = Util.getCurUrl().split("/");
             clickName = paths[paths.length - 1];
@@ -366,7 +377,7 @@
         }
 
         .opnav-right-row {
-            width: 1000px;
+            width: 3000px;
         }
 
         .opnav-link-item {
