@@ -130,7 +130,7 @@
         $("button.opnav-check-used").click(function () {
             let ckBts = document.querySelectorAll('input[type="button"][value="可用性测试"].cbi-button');
             $(ckBts).each(function () {
-                console.log(this);
+                // console.log(this);
                 $(this).trigger("click");
             });
         });
@@ -216,7 +216,12 @@
     }
 
 
-
+    let Util = {
+        getCurUrl: () => {
+            let curl = window.location.href;
+            return curl;
+        }
+    }
 
     //按照点击次数大小排序
     function compare(a, b) {
@@ -229,13 +234,9 @@
         return 0;
     }
 
-    let getCurUrl = function () {
-        let curl = window.location.href;
-        return curl;
-    }
 
     let getVisitedKey2 = function () {
-        let curl = getCurUrl();
+        let curl = Util.getCurUrl();
         //刚登录进来的url，不记录
         if (!curl.endsWith("/cgi-bin/luci/")) {
             let params = curl.split("/");
@@ -246,19 +247,36 @@
 
     // get active meau
     let getVisitedKey = function () {
+        let curUrl = Util.getCurUrl();
+
+        let menuLi = document.querySelectorAll("ul.slide-menu li a");
+        var liArr = [...menuLi]; // converts NodeList to Array
+        liArr.forEach(e => {
+            if (curUrl.endsWith($(e).attr('href'))) {
+                // console.log(e);
+                $(e).parent().addClass('active');
+                $(e).parent().parent().addClass('active').css({ 'display': 'block' });
+                // $(e).parent().parent().prev().addClass('active');
+            } else {
+                $(e).parent().removeClass('active');
+                $(e).parent().parent().removeClass('active');
+                // $(e).parent().parent().prev().removeClass('active');
+            }
+        });
+
         let meauTitle = document.querySelectorAll("body > div > div.main-left > ul > li > .menu.active")
         let active = document.querySelectorAll("body > div > div.main-left > ul > li > ul > li.active");
-        console.log(meauTitle)
+        // console.log(meauTitle)
         let clickName;
         let menuName;
         if (meauTitle.length != 1) {
-            let paths = getCurUrl().split("/");
+            let paths = Util.getCurUrl().split("/");
             menuName = paths[paths.length - 2];
         } else {
             menuName = meauTitle[0].innerText;
         }
         if (active.length > 1) {
-            let paths = getCurUrl().split("/");
+            let paths = Util.getCurUrl().split("/");
             clickName = paths[paths.length - 1];
         } else {
             clickName = active[0].innerText;
@@ -269,7 +287,7 @@
     //记录每页数据被访问次数
     let defaultVisitedData = {
         name: getVisitedKey(),
-        url: getCurUrl(),
+        url: Util.getCurUrl(),
         times: 1//默认访问次数为1
     }
 
