@@ -15,7 +15,7 @@
 (function () {
     'use strict';
 
-    let ITEM_COUNT = 5;
+    let ITEM_COUNT = 3;
 
     // create whole container div
     function createOpNavContainer() {
@@ -112,6 +112,29 @@
         return label;
     }
 
+    function createToolBox() {
+        const tb = document.createElement('div');
+        tb.classList.add("opnav-tool-box");
+        return tb;
+    }
+
+    function createCheckUsed() {
+        const tb = document.createElement('button');
+        tb.classList.add("opnav-check-used");
+        tb.innerText = "check"
+        return tb;
+    }
+
+    function checkPasswallNode() {
+        $("button.opnav-check-used").click(function () {
+            let ckBts = document.querySelectorAll('input[type="button"][value="可用性测试"].cbi-button');
+            $(ckBts).each(function () {
+                console.log(this);
+                $(this).trigger("click");
+            });
+        });
+    }
+
     // 拼装基本组件
     function initBaseComponents() {
         let container = createOpNavContainer();
@@ -120,13 +143,23 @@
         let rightCont = createRightContainer();
         let rightRow1 = createRightRow1();
         let rightRow2 = createRightRow2();
+        let toolbox = createToolBox();
+        let checkUsedBt = createCheckUsed();
+
+
         // 组装
         let op_container = document.querySelector("body header div.container");
         $(op_container).append(container);
 
         $(container).append(searchCon);
+        $(container).append(toolbox);
+        $(toolbox).append(checkUsedBt);
+        checkPasswallNode();
+
+
         $(searchCon).append(searchBar);
         $(container).append(rightCont);
+
         $(rightCont).append(rightRow1);
         $(rightCont).append(rightRow2);
 
@@ -314,7 +347,7 @@
         }
 
         .opnav-right-row {
-            width: 800px;
+            width: 1000px;
         }
 
         .opnav-link-item {
