@@ -17,6 +17,33 @@
 
     let ITEM_COUNT = 3;
 
+    var Util = {
+        getCurUrl: function () {
+            let curl = window.location.href;
+            return curl;
+        },
+        //按照点击次数大小排序
+        compare: function (a, b) {
+            if (a.times < b.times) {
+                return 1;
+            }
+            if (a.times > b.times) {
+                return -1;
+            }
+            return 0;
+        }
+    }
+
+
+
+
+    //记录每页数据被访问次数
+    let defaultVisitedData = {
+        name: '',
+        url: '',
+        times: 1//默认访问次数为1
+    }
+
     // create whole container div
     function createOpNavContainer() {
         let container = document.querySelector("body header div.container div.opnav-container");
@@ -189,12 +216,14 @@
         // console.log(input_pwd);
         if (!input_pwd) {
             initBaseComponents();
+
+            loadPage();
         }
     }();
 
 
     //create every row contain desc label and item buttons
-    let createRecentLink = function (arr) {
+    function createRecentLink(arr) {
         let row1 = createRightRow1();
         for (var v of arr) {
             const button = document.createElement('a');
@@ -204,7 +233,7 @@
             $(row1).append(button);
         }
     }
-    let createMoreAccessLink = function (arr) {
+    function createMoreAccessLink(arr) {
         let row2 = createRightRow2();
         for (var v of arr) {
             const button = document.createElement('a');
@@ -215,38 +244,8 @@
         }
     }
 
-
-    let Util = {
-        getCurUrl: () => {
-            let curl = window.location.href;
-            return curl;
-        }
-    }
-
-    //按照点击次数大小排序
-    function compare(a, b) {
-        if (a.times < b.times) {
-            return 1;
-        }
-        if (a.times > b.times) {
-            return -1;
-        }
-        return 0;
-    }
-
-
-    let getVisitedKey2 = function () {
-        let curl = Util.getCurUrl();
-        //刚登录进来的url，不记录
-        if (!curl.endsWith("/cgi-bin/luci/")) {
-            let params = curl.split("/");
-            // alert(params[params.length-2]+"_"+params[params.length-1])
-            return params[params.length - 2] + "_" + params[params.length - 1];
-        }
-    }
-
     // get active meau
-    let getVisitedKey = function () {
+    function getVisitedKey() {
         let curUrl = Util.getCurUrl();
         if (!curUrl.endsWith('/')) {
             curUrl += '/';
@@ -292,70 +291,62 @@
         } else {
             clickName = active[0].innerText;
         }
+        
+        // init defaultObj
+        defaultVisitedData.name = menuName + "-" + clickName;
+        defaultVisitedData.url = curUrl;
         return menuName + "-" + clickName;
     }
 
-    //记录每页数据被访问次数
-    let defaultVisitedData = {
-        name: getVisitedKey(),
-        url: Util.getCurUrl(),
-        times: 1//默认访问次数为1
+    function getVisitedArr() {
+        let data = GM_getValue("visitedArr") || [];
+        return data;
     }
 
-    let getStorage = {
-        getVisitedArr: () => {
-            let data = GM_getValue("visitedArr") || [];
-            return data;
-        },
-        setVisitedArr: (data) => {
-            GM_setValue("visitedArr", data);
-        },
-        getVisitedDataIndex: (key) => {
-            var index = getStorage.getVisitedArr().findIndex(obj => {
-                //console.log(obj.name, "--",key)
-                return obj.name == key
-            })
-            return index;
-        },
-        getVisitedData: (key) => {
-            var result = getStorage.getVisitedArr().find(obj => {
-                //console.log( obj.name==key)
-                return obj.name == key
-            })
-            return result;
-        },
-        setVisitedTimes: (key) => {
-            let index = getStorage.getVisitedDataIndex(key);
-            //console.log(index);
-            let arr = getStorage.getVisitedArr();
-            if (index > -1) {
-                let item = arr[index];
-                item.times++
-                arr.splice(index, 1);
-                arr.splice(0, 0, item);
-            } else {
-                if (arr.length > ITEM_COUNT) {
-                    arr.pop();
-                }
-                arr.unshift(defaultVisitedData);
+    function setVisitedArr(data) {
+        GM_setValue("visitedArr", data);
+    }
+
+    function getVisitedDataIndex(key) {
+        var index = getVisitedArr().findIndex(obj => {
+            //console.log(obj.name, "--",key)
+            return obj.name == key
+        })
+        return index;
+    }
+
+    // op data in GM
+    function setVisitedTimes(key) {
+        let index = getVisitedDataIndex(key);
+        //console.log(index);
+        let arr = getVisitedArr();
+        if (index > -1) {
+            let item = arr[index];
+            item.times++
+            arr.splice(index, 1);
+            arr.splice(0, 0, item);
+        } else {
+            if (arr.length > ITEM_COUNT) {
+                arr.pop();
             }
-            getStorage.setVisitedArr(arr);
+            arr.unshift(defaultVisitedData);
         }
+        setVisitedArr(arr);
     }
 
-    let loadPage = function () {
+    function loadPage() {
         //GM_deleteValue("visitedArr")
         //把当前页加入访问次数 数据结构
-        getStorage.setVisitedTimes(getVisitedKey());
-        //console.log(getStorage.getVisitedArr());
+        setVisitedTimes(getVisitedKey());
+        //console.log(getVisitedArr());
 
-        let visitedData = getStorage.getVisitedArr();
-        createRecentLink(visitedData, "最近访问>> ");
-        visitedData.sort(compare);
-        createMoreAccessLink(visitedData, "最多访问>> ");
+        let visitedData = getVisitedArr();
+        createRecentLink(visitedData);
+
+        visitedData.sort(Util.compare);
+        createMoreAccessLink(visitedData);
 
     }
-    loadPage()
 
     //openwrt's container in head must set height 100%
     let css = `
