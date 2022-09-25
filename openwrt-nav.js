@@ -153,15 +153,24 @@
     }
 
     //
-    async function checkPasswallNode() {
+    function checkPasswallNode() {
         $("button.opnav-check-used").click(async function () {
             let ckBts = document.querySelectorAll('input[type="button"][value="可用性测试"].cbi-button');
-            for (let i = 0; i < ckBts.length; i++) {
+            let len = ckBts.length;
+            for (let i = 0; i < len; i++) {
                 $(ckBts[i]).trigger("click");
                 console.log("click" + i);
-                await sleep(1000);
+                await sleep(100);
+                if (i == len - 1) {
+                    //loop done..
+                    // mostAvailability();
+                }
             }
         });
+    }
+
+    function mostAvailability() {
+        // todo
     }
 
     function sleep(ms) {
