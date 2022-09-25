@@ -153,14 +153,19 @@
     }
 
     //
-    function checkPasswallNode() {
-        $("button.opnav-check-used").click(function () {
+    async function checkPasswallNode() {
+        $("button.opnav-check-used").click(async function () {
             let ckBts = document.querySelectorAll('input[type="button"][value="可用性测试"].cbi-button');
-            $(ckBts).each(function () {
-                // console.log(this);
-                $(this).trigger("click");
-            });
+            for (let i = 0; i < ckBts.length; i++) {
+                $(ckBts[i]).trigger("click");
+                console.log("click" + i);
+                await sleep(1000);
+            }
         });
+    }
+
+    function sleep(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
     }
 
     // 拼装基本组件
@@ -291,7 +296,7 @@
         } else {
             clickName = active[0].innerText;
         }
-        
+
         // init defaultObj
         defaultVisitedData.name = menuName + "-" + clickName;
         defaultVisitedData.url = curUrl;
