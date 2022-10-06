@@ -1,14 +1,22 @@
 ///mnt/mmcblk2p4/ql/data/scripts/
 const fs = require('fs');
 let os = require("os");
-//print log in arr
-let proNames = ['*'];
-
+const axios = require('axios');
+const BARK_PUSH = true;
+const timeout = 15000;
 
 // QingLong log path
 const qlLogPath = '/ql/data/log/';
 const timeStamp = getTodayDateStr(true);
 let timeStampRead;
+
+//白名单
+let WHITELIST = ['6dylan6_jdpro'];
+//日志黑名单
+let BLACKLIST = [
+    'testNotify',
+    'jd_dreamFactory'
+];
 
 fs.readFile(__dirname + '/notifyTimeLog.txt', function (err, data) {
     if (err) {
@@ -20,7 +28,7 @@ fs.readFile(__dirname + '/notifyTimeLog.txt', function (err, data) {
         timeStampRead = arr[arr.length - 2];//每次写入会额外加入一个空行，因此最后一行是空行。
         if (timeStampRead) {
             console.log("Read last write date is: " + timeStampRead)
-            readSpecifyLogFolder();
+            loopLogDirs();
         } else {
             console.error('Read last write date error: ' + timeStampRead)
         }
@@ -39,22 +47,24 @@ function writeExeTime() {
         });
 }
 
-function readSpecifyLogFolder() {
-    fs.readdir(qlLogPath, (err, files) => {
+function loopLogDirs() {
+    fs.readdir(qlLogPath, (err, LogDirs) => {
 
         if (!err) {
-            let result = files.filter(x => filterLogFolder(x, proNames));
+            //hit white list
+            let whiteLogDirs = LogDirs.filter(curLogFolder => filterLogFolder(curLogFolder, WHITELIST));
 
-            //自身脚本产生的日志不发送
-            result = result.filter(x => x.indexOf('testNotify') == -1);
-            let len = result.length;
+            //filter black list
+            whiteLogDirs = whiteLogDirs.filter(curLogFolder => filterBlackList(curLogFolder, BLACKLIST));
+
+            let len = whiteLogDirs.length;
             if (len == 0) {
                 console.log('no log folders');
                 return;
             }
-            console.log('will scan log folder nums:' + len + ', base log folder is:[' + proNames + ']');
+            console.log('will scan log folder nums:' + len + ', base log folder is:[' + WHITELIST + ']');
             for (let i = 0; i < len; i++) {
-                let folderName = result[i];
+                let folderName = whiteLogDirs[i];
                 readLogFilesInDir(folderName);
             }
         } else {
@@ -89,12 +99,17 @@ function readLogFilesInDir(folder) {
 }
 
 // filter specify logFolder
-function filterLogFolder(curName, nameArr) {
-    return nameArr.some(x => curName.indexOf(x) > -1);
+function filterLogFolder(curLogFolder, nameArr) {
+    return nameArr.some(x => curLogFolder.indexOf(x) > -1);
+}
+
+// filter black list
+// return true: not in blacklist
+function filterBlackList(curLogFolder, blackList) {
+    return blackList.some(x => curLogFolder.indexOf(x) < 0);
 }
 
 function readSingleLog(filePath, curLogName) {
-    console.log(filePath);
     fs.stat(filePath, (err, stats) => {
         if (err) {
             console.log(`File doesn't exist.`)
@@ -201,9 +216,6 @@ function paddingZero(v) {
     return v.length == 1 ? '0' + v : v;
 }
 
-const axios = require('axios');
-let BARK_PUSH = true;
-const timeout = 15000;
 function BarkNotify(title, desp) {
     if (BARK_PUSH) {
         const options = {
