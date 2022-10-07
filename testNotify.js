@@ -15,7 +15,10 @@ let WHITELIST = ['6dylan6_jdpro'];
 //日志黑名单
 let BLACKLIST = [
     'testNotify',
-    'jd_dreamFactory'
+    'jd_dreamFactory',
+    'jd_jxmc',//jx牧场
+    'jd_cfd',//财富岛
+    'jd_jdfactory',//dd工厂
 ];
 
 fs.readFile(__dirname + '/notifyTimeLog.txt', function (err, data) {
@@ -52,19 +55,19 @@ function loopLogDirs() {
 
         if (!err) {
             //hit white list
-            let whiteLogDirs = LogDirs.filter(curLogFolder => filterLogFolder(curLogFolder, WHITELIST));
+            let filterLogDirs = LogDirs.filter(curLogFolder => hitWhiteList(curLogFolder, WHITELIST));
 
             //filter black list
-            whiteLogDirs = whiteLogDirs.filter(curLogFolder => filterBlackList(curLogFolder, BLACKLIST));
-
-            let len = whiteLogDirs.length;
+            filterLogDirs = filterLogDirs.filter(curLogFolder => !hitBlackList(curLogFolder, BLACKLIST));
+            // console.log(filterLogDirs);
+            let len = filterLogDirs.length;
             if (len == 0) {
                 console.log('no log folders');
                 return;
             }
             console.log('will scan log folder nums:' + len + ', base log folder is:[' + WHITELIST + ']');
             for (let i = 0; i < len; i++) {
-                let folderName = whiteLogDirs[i];
+                let folderName = filterLogDirs[i];
                 readLogFilesInDir(folderName);
             }
         } else {
@@ -98,15 +101,14 @@ function readLogFilesInDir(folder) {
     });
 }
 
-// filter specify logFolder
-function filterLogFolder(curLogFolder, nameArr) {
-    return nameArr.some(x => curLogFolder.indexOf(x) > -1);
+// hit white list
+function hitWhiteList(curLogFolder, whiteList) {
+    return whiteList.some(x => curLogFolder.indexOf(x) > -1);
 }
 
-// filter black list
-// return true: not in blacklist
-function filterBlackList(curLogFolder, blackList) {
-    return blackList.some(x => curLogFolder.indexOf(x) < 0);
+// hit black list
+function hitBlackList(curLogFolder, blackList) {
+    return blackList.some(x => curLogFolder.indexOf(x) > -1);
 }
 
 function readSingleLog(filePath, curLogName) {
