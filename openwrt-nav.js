@@ -10,6 +10,7 @@
 // @grant        GM_setValue
 // @grant        GM_addStyle
 // @grant        GM_deleteValue
+// @require      file://d:\fstage\1.program\homesmart\openwrt-nav.js
 // ==/UserScript==
 
 (function () {
@@ -31,6 +32,12 @@
                 return -1;
             }
             return 0;
+        },
+        appendSlash: function (url) {
+            if (!url.endsWith('/')) {
+                url += '/';
+            }
+            return url;
         }
     }
 
@@ -231,7 +238,7 @@
         if (!input_pwd) {
             initBaseComponents();
 
-            loadPage();
+            loadPageDate();
         }
     }();
 
@@ -261,19 +268,16 @@
     // get active meau
     function getVisitedKey() {
         let curUrl = Util.getCurUrl();
-        if (!curUrl.endsWith('/')) {
-            curUrl += '/';
+        curUrl = Util.appendSlash(curUrl);
+        //http://xxx/cgi-bin/luci/ 初始首页
+        if (curUrl.endsWith('luci/')) {
+            return;
         }
-        console.log(curUrl);
-
         let menuLi = document.querySelectorAll("ul.slide-menu li a");
         var liArr = [...menuLi]; // converts NodeList to Array
         liArr.forEach(e => {
             let itemUrl = $(e).attr('href').toLowerCase();
-            if (!itemUrl.endsWith('/')) {
-                itemUrl += '/';
-            }
-
+            itemUrl = Util.appendSlash(itemUrl);
             if (curUrl.indexOf(itemUrl) > -1) {
                 console.log(curUrl, e);
                 $(e).parent().addClass('active');
@@ -297,8 +301,6 @@
         } else {
             menuName = meauTitle[0].innerText;
         }
-        console.log(active);
-
         if (active.length > 1) {
             let paths = Util.getCurUrl().split("/");
             clickName = paths[paths.length - 1];
@@ -331,24 +333,25 @@
 
     // op data in GM
     function setVisitedTimes(key) {
-        let index = getVisitedDataIndex(key);
-        //console.log(index);
-        let arr = getVisitedArr();
-        if (index > -1) {
-            let item = arr[index];
-            item.times++
-            arr.splice(index, 1);
-            arr.splice(0, 0, item);
-        } else {
-            if (arr.length > ITEM_COUNT) {
-                arr.pop();
+        if (key) {
+            let index = getVisitedDataIndex(key);
+            let arr = getVisitedArr();
+            if (index > -1) {
+                let item = arr[index];
+                item.times++
+                arr.splice(index, 1);
+                arr.splice(0, 0, item);
+            } else {
+                if (arr.length > ITEM_COUNT) {
+                    arr.pop();
+                }
+                arr.unshift(defaultVisitedData);
             }
-            arr.unshift(defaultVisitedData);
+            setVisitedArr(arr);
         }
-        setVisitedArr(arr);
     }
 
-    function loadPage() {
+    function loadPageDate() {
         //GM_deleteValue("visitedArr")
         //把当前页加入访问次数 数据结构
         setVisitedTimes(getVisitedKey());
@@ -359,7 +362,6 @@
 
         visitedData.sort(Util.compare);
         createMoreAccessLink(visitedData);
-
     }
 
     //openwrt's container in head must set height 100%
