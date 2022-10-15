@@ -1,7 +1,5 @@
 {
-    //Update:2022-10-15 10:48:27.041358
-    
-    "spider":"https://ghproxy.com/https://raw.githubusercontent.com/vpei/Free-TVUrl-Merge/main/res/XBiubiuLA4.PNG", //"spider":"http://freed.yuanhsing.cf/TVBox/MaooXB2/XBiubiuLA4.jar", //https://raw.iqiq.io/vpei/Free-TVUrl-Merge/main/res/XBiubiuLA4.PNG
+    "spider":"https://ghproxy.com/https://raw.githubusercontent.com/vpei/Free-TVUrl-Merge/main/res/XBiubiuLA4.PNG",
     
     "lives":[{"group":"redirect","channels":[{"name":"live","urls":["proxy://do=live&type=txt&ext=aHR0cHM6Ly9jZG4uanNkZWxpdnIubmV0L2doL0N5cmlsMDU2My9sYW5qaW5nX2xpdmVAbWFpbi9UVmJveF9GcmVlL0xJVkUvRnJlZS90dmJveF9saXZlLnR4dA=="]}]}],
     
