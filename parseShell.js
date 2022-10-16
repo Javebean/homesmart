@@ -22,7 +22,7 @@ const fs = require('fs');
 const readline = require('readline');
 
 let read = false;
-
+let sysPackage = [];
 
 async function processLineByLine() {
     const fileStream = fs.createReadStream(__dirname + '/parseShell.js');
@@ -41,18 +41,24 @@ async function processLineByLine() {
         }
         if (read && line.trim()) {
             // console.log(`Line from file: ${line}`);
-            let syntax = removePackage(getPackagePath(line));
-            console.log(syntax);
+            if (line.indexOf('/system') > -1) {
+                sysPackage.push(removePackage(getPackagePath(line)));
+            } else {
+                let syntax = removePackage(getPackagePath(line));
+                console.log(syntax);
+            }
         }
         if (line.startsWith('START')) {
             read = true;
         }
     }
+    console.log("=========NOTE!SYSTEM!==========");
+    for (const syntax of sysPackage) {
+        console.log(syntax);
+    }
 }
 
-function filterSystem() {
 
-}
 
 function getPackagePath(info) {
     let s = info.indexOf(':') + 1;
@@ -62,11 +68,7 @@ function getPackagePath(info) {
 }
 
 function removePackage(path) {
-    if (path.startsWith('/system')) {
-        return 'rm -f??!!' + path;
-    } else {
-        return 'rm -f ' + path;
-    }
+    return 'rm -f ' + path;
 }
 
 processLineByLine();
