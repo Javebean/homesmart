@@ -1,16 +1,26 @@
 /**
  * 
+ 
+ #google google search
+ package:/system/priv-app/Velvet/Velvet.apk=com.google.android.googlequicksearchbox //可卸载
+ package:/system/priv-app/GoogleOneTimeInitializer/GoogleOneTimeInitializer.apk=com.google.android.onetimeinitializer
+ package:/system/app/ConfigUpdater/ConfigUpdater.apk=com.google.android.configupdater
+ package:/system/priv-app/GooglePartnerSetup/GooglePartnerSetup.apk=com.google.android.partnersetup
+ 
 START
 
-  
-package:/system/priv-app/TvSettings/TvSettings.apk=com.android.tv.settings
-package:/data/app/com.dangbei.tvlauncher-1/base.apk=com.dangbei.tvlauncher
+package:/system/app/com.shafa.zhuomian_2.4.7_xm0014/com.shafa.zhuomian_2.4.7_xm0014.apk=com.shafa.launcher
+package:/system/app/com.shafa.market/com.shafa.market.apk=com.shafa.market
+
+
+package:/data/app/com.tv.kuaisou-1/base.apk=com.tv.kuaisou
 package:/data/app/com.gitvdemo.video-1/base.apk=com.gitvdemo.video
 package:/data/app/com.moretv.android-1/base.apk=com.moretv.android
 package:/data/app/com.cibn.tv-1/base.apk=com.cibn.tv
 package:/data/app/com.linkin.tv-1/base.apk=com.linkin.tv
 
-
+/system/app/dabaizhiyin/dabaizhiyin.apk=com.ph.remote
+package:/system/app/PPPoE/PPPoE.apk=com.droidlogic.PPPoE
 
 END
  * 
@@ -68,7 +78,7 @@ function getPackagePath(info) {
 }
 
 function removePackage(path) {
-    return 'rm -f ' + path;
+    return 'adb shell rm -f ' + path;
 }
 
 processLineByLine();
