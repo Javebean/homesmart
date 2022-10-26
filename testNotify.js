@@ -19,6 +19,9 @@ let BLACKLIST = [
     'jd_jxmc',//jx牧场
     'jd_cfd',//财富岛
     'jd_jdfactory',//dd工厂
+    'jd_wish',//
+    'jd_beauty',//
+    'jd_xinruimz',//
 ];
 
 fs.readFile(__dirname + '/notifyTimeLog.txt', function (err, data) {
@@ -88,7 +91,7 @@ function readLogFilesInDir(folder) {
                 let curLogName = files[i];
                 if (curLogName > timeStampRead) {
                     let singleLogPath = qlLogPath + folder + "/" + curLogName;
-                    readSingleLog(singleLogPath, curLogName);
+                    readSingleLog(singleLogPath, folder);
                     needSend = true;
                 }
             }
@@ -111,22 +114,22 @@ function hitBlackList(curLogFolder, blackList) {
     return blackList.some(x => curLogFolder.indexOf(x) > -1);
 }
 
-function readSingleLog(filePath, curLogName) {
+function readSingleLog(filePath, descriptor) {
     fs.stat(filePath, (err, stats) => {
         if (err) {
             console.log(`File doesn't exist.`)
         } else {
             if (stats.size > 4000) { //4096byte = 4KB
-                console.log(stats)
-
-                readPart(filePath);
+                // console.log(stats)
+                readPart(filePath, descriptor);
             } else {
                 fs.readFile(filePath, { encoding: 'utf-8' }, function (err, data) {
                     if (!err) {
                         // console.log(filePath);
                         console.log('==================start send Bark Message================');
-                        console.log('Log Content ：\r\n' + data);
-                        BarkNotify(curLogName, data)
+                        //console.log('Log Content ：\r\n' + data);
+                        let title = getTitleInFile(data) || descriptor;
+                        BarkNotify(title, data)
                     } else {
                         console.log(err);
                     }
@@ -172,12 +175,22 @@ async function* generateChunks(filePath, size) {
     }
 }
 
-async function readPart(file) {
+async function readPart(file, descriptor) {
     let CHUNK_SIZE = 4000;
+    let index = 0;
+    let isFindTitle = false;
+    let title;
     for await (const chunk of generateChunks(file, CHUNK_SIZE)) {
-        // do someting with data  
-        // console.log(chunk.toString());
-        BarkNotify("PART", chunk.toString())
+        if (!isFindTitle) {
+            title = getTitleInFile(chunk.toString());
+            if (!title) {
+                title = descriptor;
+            } else {
+                isFindTitle = true;
+            }
+        }
+        index++;
+        BarkNotify(title + "-" + index, chunk.toString())
         await waitTime();
     }
 }
@@ -193,9 +206,9 @@ function getTodayDateStr(time, offset) {
     if (offset) {
         dateObj.setHours(dateObj.getHours() + offset);
     }
-    let year = dateObj.getUTCFullYear();
-    let month = dateObj.getUTCMonth() + 1; //months from 1-12
-    let day = dateObj.getUTCDate();
+    let year = dateObj.getFullYear();
+    let month = dateObj.getMonth() + 1; //months from 1-12
+    let day = dateObj.getDate();
     month = paddingZero(month);
     day = paddingZero(day);
     let newdate = year + "-" + month + "-" + day;
@@ -218,7 +231,29 @@ function paddingZero(v) {
     return v.length == 1 ? '0' + v : v;
 }
 
+// https://masteringjs.io/tutorials/fundamentals/foreach-break
+function getTitleInFile(data) {
+    let title;
+    let shouldSkip = false;
+    data.split(/\r?\n/).forEach(function (line) {
+        if (shouldSkip) {
+            return;
+        }
+        if (line.indexOf(', 开始!') > 0) {
+            console.log(line);
+            title = line;
+            shouldSkip = true;
+            return;
+        }
+    })
+    return title;
+}
+
 function BarkNotify(title, desp) {
+    if (!desp) {
+        return;
+    }
+
     if (BARK_PUSH) {
         const options = {
             url: 'https://api.day.app/**',
