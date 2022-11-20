@@ -4,13 +4,16 @@ let os = require("os");
 const axios = require('axios');
 const BARK_PUSH = true;
 const timeout = 15000;
+let logCount = 0;
+
+const CHUNK_SIZE = 4000;
 
 // QingLong log path
 const qlLogPath = '/ql/data/log/';
 const timeStamp = getTodayDateStr(true);
 let timeStampRead;
 
-//白名单
+//项目白名单
 let WHITELIST = ['6dylan6_jdpro'];
 //日志黑名单
 let BLACKLIST = [
@@ -24,27 +27,40 @@ let BLACKLIST = [
     'jd_xinruimz',//
 ];
 
+//level 0：简易通知，只显示知否完成
+//level 1: 完整通知
+const GLOBAL_LEVEL_0 = 0;
+const GLOBAL_LEVEL_1 = 1;
+let GLOBAL_MSG = '';
+let GLOBAL_LEVEL = GLOBAL_LEVEL_0; //0 1 2
+
 fs.readFile(__dirname + '/notifyTimeLog.txt', function (err, data) {
     if (err) {
-        // console.log(err);
-        timeStampRead = getTodayDateStr(1, -2);
+        console.log(err);
+        // timeStampRead = getTodayDateStr(1, -2);
     } else {
         const arr = data.toString().replace(/\r\n/g, '\n').split('\n');
         console.log(arr);
-        timeStampRead = arr[arr.length - 2];//每次写入会额外加入一个空行，因此最后一行是空行。
+        for (let i = arr.length - 1; i >= 0; i--) {
+            if (arr[i] && arr[i].length > 4) {
+                timeStampRead = arr[i];//每次写入会额外加入一个空行，因此最后一行是空行。
+                break;
+            }
+        }
+
         if (timeStampRead) {
-            console.log("Read last write date is: " + timeStampRead)
+            console.log("上次通知的时间戳: " + timeStampRead)
             loopLogDirs();
         } else {
-            console.error('Read last write date error: ' + timeStampRead)
+            console.error('错误的时间戳: ' + timeStampRead)
         }
+        writeExeTime(arr.length > 50 ? 'w' : 'a');
     }
-    writeExeTime();
 });
 
-function writeExeTime() {
+function writeExeTime(f) {
     // 将数据写入文件sample.html
-    fs.writeFile(__dirname + '/notifyTimeLog.txt', timeStamp + os.EOL, { flag: 'a' },
+    fs.writeFile(__dirname + '/notifyTimeLog.txt', timeStamp + os.EOL, { flag: f },
         // 写入文件后调用的回调函数
         function (err) {
             if (err) throw err;
@@ -55,7 +71,6 @@ function writeExeTime() {
 
 function loopLogDirs() {
     fs.readdir(qlLogPath, (err, LogDirs) => {
-
         if (!err) {
             //hit white list
             let filterLogDirs = LogDirs.filter(curLogFolder => hitWhiteList(curLogFolder, WHITELIST));
@@ -119,17 +134,18 @@ function readSingleLog(filePath, descriptor) {
         if (err) {
             console.log(`File doesn't exist.`)
         } else {
-            if (stats.size > 4000) { //4096byte = 4KB
+            if (stats.size > CHUNK_SIZE) { //4096byte = 4KB
                 // console.log(stats)
+                // send message separate
                 readPart(filePath, descriptor);
             } else {
                 fs.readFile(filePath, { encoding: 'utf-8' }, function (err, data) {
                     if (!err) {
                         // console.log(filePath);
-                        console.log('==================start send Bark Message================');
-                        //console.log('Log Content ：\r\n' + data);
+                        // console.log('Log Content ：\r\n' + data);
                         let title = getTitleInFile(data) || descriptor;
-                        BarkNotify(title, data)
+                        logCount++;
+                        scheduleSendNotify(title, data)
                     } else {
                         console.log(err);
                     }
@@ -155,7 +171,6 @@ function readBytes(fd, buffer) {
     });
 }
 
-const WAIT = 0;
 async function* generateChunks(filePath, size) {
     const sharedBuffer = Buffer.alloc(size);
     const stats = fs.statSync(filePath); // file details
@@ -176,7 +191,6 @@ async function* generateChunks(filePath, size) {
 }
 
 async function readPart(file, descriptor) {
-    let CHUNK_SIZE = 4000;
     let index = 0;
     let isFindTitle = false;
     let title;
@@ -190,14 +204,15 @@ async function readPart(file, descriptor) {
             }
         }
         index++;
-        BarkNotify(title + "-" + index, chunk.toString())
-        await waitTime();
+        logCount++;
+        scheduleSendNotify(title + "-" + index, chunk.toString())
+        await waitTime(0);
     }
 }
 
-const waitTime = () => {
+const waitTime = (WAIT_TIME) => {
     return new Promise(resolve => {
-        setTimeout(resolve, WAIT)
+        setTimeout(resolve, WAIT_TIME)
     });
 }
 
@@ -249,18 +264,47 @@ function getTitleInFile(data) {
     return title;
 }
 
-function BarkNotify(title, desp) {
-    if (!desp) {
+let lastLogCount = -1;
+let checkTimes = 0;//三次检测 logCount不再增长的话，说明这次遍历结束
+let checkStart = false;
+async function scheduleSendNotify(title, content) {
+    console.log("触发scheduleSendNotify :"+logCount);
+    if (GLOBAL_LEVEL == GLOBAL_LEVEL_0) {
+        GLOBAL_MSG += title + ':done。\n';
+        if (!checkStart) {
+            checkStart = true
+            for (var i = 0; i < 100; i++) {
+                if (logCount != lastLogCount) {
+                    lastLogCount = logCount;
+                    console.log("检测次数 :"+i);
+                } else {
+                    checkTimes++
+                    console.log("检测次数(不变) :"+i);
+                    if (checkTimes == 3) {
+                        BarkNotify('简易通知', GLOBAL_MSG);
+                        break;
+                    }
+                }
+                await waitTime(1000);
+            }
+        }
+    } else if (GLOBAL_LEVEL == GLOBAL_LEVEL_1) {
+        BarkNotify(title, content);
+    }
+}
+
+function BarkNotify(title, content) {
+    if (!content) {
         return;
     }
-
     if (BARK_PUSH) {
         const options = {
             url: 'https://api.day.app/**',
             body: desp,
             title: title,
             group: 'QingLong',
-            icon: 'http://qn.whyour.cn/logo.png',
+            icon: 'http://day.app/assets/images/avatar.jpg',
+            level: 'passive',
             sound: '',
             headers: {
                 'Content-Type': 'application/json; charset=utf-8',
