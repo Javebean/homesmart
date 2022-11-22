@@ -32,7 +32,7 @@ let BLACKLIST = [
 const GLOBAL_LEVEL_0 = 0;
 const GLOBAL_LEVEL_1 = 1;
 let GLOBAL_MSG = '';
-let GLOBAL_LEVEL = GLOBAL_LEVEL_0; //0 1 2
+let GLOBAL_LEVEL = GLOBAL_LEVEL_0;
 
 fs.readFile(__dirname + '/notifyTimeLog.txt', function (err, data) {
     if (err) {
@@ -134,22 +134,23 @@ function readSingleLog(filePath, descriptor) {
         if (err) {
             console.log(`File doesn't exist.`)
         } else {
-            if (stats.size > CHUNK_SIZE) { //4096byte = 4KB
-                // console.log(stats)
-                // send message separate
-                readPart(filePath, descriptor);
-            } else {
-                fs.readFile(filePath, { encoding: 'utf-8' }, function (err, data) {
+            if (GLOBAL_LEVEL == GLOBAL_LEVEL_0 || stats.size < CHUNK_SIZE) { //4096byte = 4KB
+                fs.readFile(filePath, { encoding: 'utf-8' }, function (err, content) {
                     if (!err) {
                         // console.log(filePath);
                         // console.log('Log Content ：\r\n' + data);
-                        let title = getTitleInFile(data) || descriptor;
+                        let keyObj = getTitleInFile(content);
+                        keyObj.title = keyObj.title || descriptor;
                         logCount++;
-                        scheduleSendNotify(title, data)
+                        scheduleSendNotify(keyObj, content)
                     } else {
                         console.log(err);
                     }
                 });
+            } else {
+                // console.log(stats)
+                // send message separate
+                readPart(filePath, descriptor);
             }
         }
     })
@@ -204,8 +205,7 @@ async function readPart(file, descriptor) {
             }
         }
         index++;
-        logCount++;
-        scheduleSendNotify(title + "-" + index, chunk.toString())
+        BarkNotify(title + "-" + index, chunk.toString());
         await waitTime(0);
     }
 }
@@ -248,39 +248,48 @@ function paddingZero(v) {
 
 // https://masteringjs.io/tutorials/fundamentals/foreach-break
 function getTitleInFile(data) {
-    let title;
-    let shouldSkip = false;
+    let obj = {};
+    let shouldSkip = 0;
     data.split(/\r?\n/).forEach(function (line) {
         if (shouldSkip) {
             return;
         }
         if (line.indexOf(', 开始!') > 0) {
-            console.log(line);
-            title = line;
-            shouldSkip = true;
+            // console.log(line);
+            obj.title = line;
+            // shouldSkip++;
+        }
+
+        if (line.indexOf('执行结束') > 0) {
+            // console.log(line);
+            obj.endLine = line;
+            shouldSkip++;
+        }
+
+        if (shouldSkip > 0) {
             return;
         }
     })
-    return title;
+    return obj;
 }
 
 let lastLogCount = -1;
-let checkTimes = 0;//三次检测 logCount不再增长的话，说明这次遍历结束
+let checkTimes = 0;//多次检测 logCount不再增长的话，说明这次遍历结束
 let checkStart = false;
-async function scheduleSendNotify(title, content) {
-    console.log("触发scheduleSendNotify :"+logCount);
+async function scheduleSendNotify(keyObj, content) {
+    console.log("触发scheduleSendNotify :" + logCount);
     if (GLOBAL_LEVEL == GLOBAL_LEVEL_0) {
-        GLOBAL_MSG += title + ':done。\n';
+        GLOBAL_MSG += keyObj.title + ':任务完成\n' + keyObj.endLine + '\n';
         if (!checkStart) {
             checkStart = true
             for (var i = 0; i < 100; i++) {
                 if (logCount != lastLogCount) {
                     lastLogCount = logCount;
-                    console.log("检测次数 :"+i);
+                    console.log("检测次数 :" + i + 'logCount:' + logCount + ', lastLogCount:' + lastLogCount);
                 } else {
                     checkTimes++
-                    console.log("检测次数(不变) :"+i);
-                    if (checkTimes == 3) {
+                    console.log("检测次数(不变) :" + i + 'logCount:' + logCount + ', lastLogCount:' + lastLogCount);
+                    if (checkTimes == 5) {
                         BarkNotify('简易通知', GLOBAL_MSG);
                         break;
                     }
@@ -288,8 +297,8 @@ async function scheduleSendNotify(title, content) {
                 await waitTime(1000);
             }
         }
-    } else if (GLOBAL_LEVEL == GLOBAL_LEVEL_1) {
-        BarkNotify(title, content);
+    } else {
+        BarkNotify(keyObj.title, content);
     }
 }
 
@@ -304,7 +313,7 @@ function BarkNotify(title, content) {
             title: title,
             group: 'QingLong',
             icon: 'http://day.app/assets/images/avatar.jpg',
-            level: 'passive',
+            level: GLOBAL_LEVEL == GLOBAL_LEVEL_0 ? 'active' : 'passive',
             sound: '',
             headers: {
                 'Content-Type': 'application/json; charset=utf-8',
