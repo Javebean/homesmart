@@ -1,6 +1,6 @@
 ///mnt/mmcblk2p4/ql/data/scripts/
 const fs = require('fs');
-let os = require("os");
+let os = require('os');
 const axios = require('axios');
 const BARK_PUSH = true;
 const timeout = 15000;
@@ -43,13 +43,14 @@ fs.readFile(__dirname + '/notifyTimeLog.txt', function (err, data) {
         console.log(arr);
         for (let i = arr.length - 1; i >= 0; i--) {
             if (arr[i] && arr[i].length > 4) {
-                timeStampRead = arr[i];//每次写入会额外加入一个空行，因此最后一行是空行。
+                timeStampRead = arr[i];//倒序选择第一个时间
+                // timeStampRead = '2022-11-23-15-12-46';
                 break;
             }
         }
 
         if (timeStampRead) {
-            console.log("上次通知的时间戳: " + timeStampRead)
+            console.log('上次通知的时间戳: ' + timeStampRead)
             loopLogDirs();
         } else {
             console.error('错误的时间戳: ' + timeStampRead)
@@ -65,7 +66,7 @@ function writeExeTime(f) {
         function (err) {
             if (err) throw err;
             // 如果没有错误
-            console.log("logdate is written to file successfully: " + timeStamp)
+            console.log('logdate is written to file successfully: ' + timeStamp)
         });
 }
 
@@ -95,23 +96,22 @@ function loopLogDirs() {
 }
 
 // file logs in every folder
-function readLogFilesInDir(folder) {
-    fs.readdir(qlLogPath + folder, (err, files) => {
+function readLogFilesInDir(folderName) {
+    fs.readdir(qlLogPath + folderName, (err, files) => {
         if (!err) {
-            let len1 = files.length;
-            let needSend = false;
-            for (let i = 0; i < len1; i++) {
-                //青龙的日志文件格式都是2022-09-16-22-37-11.log格式
-                //直接比较字符串就行,大于上次扫描的时间
-                let curLogName = files[i];
-                if (curLogName > timeStampRead) {
-                    let singleLogPath = qlLogPath + folder + "/" + curLogName;
-                    readSingleLog(singleLogPath, folder);
-                    needSend = true;
-                }
+            //青龙的日志文件格式都是2022-09-16-22-37-11.log格式
+            //不管正序倒序，比较出最新的日志即可
+            let logTime1 = files[0];
+            let logTime2 = files[files.length - 1];
+
+            if (logTime1 > logTime2) {
+                logTime2 = logTime1;
             }
-            if (!needSend) {
-                // console.log(folder + ' no log to send via BARK!');
+
+            if (logTime2 > timeStampRead) {
+                let singleLogPath = qlLogPath + folderName + '/' + logTime2;
+                // console.log(singleLogPath);
+                readSingleLog(singleLogPath, folderName);
             }
         } else {
             console.log(err);
@@ -205,7 +205,7 @@ async function readPart(file, descriptor) {
             }
         }
         index++;
-        BarkNotify(title + "-" + index, chunk.toString());
+        BarkNotify(title + '-' + index, chunk.toString());
         await waitTime(0);
     }
 }
@@ -226,7 +226,7 @@ function getTodayDateStr(time, offset) {
     let day = dateObj.getDate();
     month = paddingZero(month);
     day = paddingZero(day);
-    let newdate = year + "-" + month + "-" + day;
+    let newdate = year + '-' + month + '-' + day;
     if (time) {
         let hour = dateObj.getHours();
         let minutes = dateObj.getMinutes();
@@ -249,24 +249,32 @@ function paddingZero(v) {
 // https://masteringjs.io/tutorials/fundamentals/foreach-break
 function getTitleInFile(data) {
     let obj = {};
-    let shouldSkip = 0;
+    let shouldSkip = false;
+    let accountSimpleCount = -1;
     data.split(/\r?\n/).forEach(function (line) {
         if (shouldSkip) {
             return;
         }
         if (line.indexOf(', 开始!') > 0) {
-            // console.log(line);
             obj.title = line;
-            // shouldSkip++;
+        }
+
+        if (accountSimpleCount > 0) {
+            accountSimpleCount--;
+            obj.accountSimpleLine = obj.accountSimpleLine + line + os.EOL + os.EOL;
+        }
+        if (line.indexOf('开始【京东账号') > 0) {
+            // console.log(line);
+            obj.accountSimpleLine = (obj.accountSimpleLine || '') + line + os.EOL;
+            accountSimpleCount = 5;
         }
 
         if (line.indexOf('执行结束') > 0) {
-            // console.log(line);
             obj.endLine = line;
-            shouldSkip++;
+            shouldSkip = true;
         }
 
-        if (shouldSkip > 0) {
+        if (shouldSkip) {
             return;
         }
     })
@@ -277,20 +285,30 @@ let lastLogCount = -1;
 let checkTimes = 0;//多次检测 logCount不再增长的话，说明这次遍历结束
 let checkStart = false;
 async function scheduleSendNotify(keyObj, content) {
-    console.log("触发scheduleSendNotify :" + logCount);
+    console.log('触发scheduleSendNotify :' + logCount);
     if (GLOBAL_LEVEL == GLOBAL_LEVEL_0) {
-        GLOBAL_MSG += keyObj.title + ':任务完成\n' + keyObj.endLine + '\n';
+        GLOBAL_MSG += keyObj.title + os.EOL + keyObj.accountSimpleLine + keyObj.endLine + os.EOL + os.EOL;
         if (!checkStart) {
             checkStart = true
             for (var i = 0; i < 100; i++) {
                 if (logCount != lastLogCount) {
                     lastLogCount = logCount;
-                    console.log("检测次数 :" + i + 'logCount:' + logCount + ', lastLogCount:' + lastLogCount);
+                    console.log('检测次数 :' + i + ', logCount:' + logCount + ', lastLogCount:' + lastLogCount);
                 } else {
                     checkTimes++
-                    console.log("检测次数(不变) :" + i + 'logCount:' + logCount + ', lastLogCount:' + lastLogCount);
-                    if (checkTimes == 5) {
-                        BarkNotify('简易通知', GLOBAL_MSG);
+                    console.log('检测次数(不变) :' + i + ', logCount:' + logCount + ', lastLogCount:' + lastLogCount);
+                    if (checkTimes == 3) {
+                        var size = 1000; //length ≠ byte size
+                        var k = Math.ceil(GLOBAL_MSG.length / size);
+                        console.log(k, GLOBAL_MSG.length);
+                        for (var c = 0; c < k; c++) {
+                            // console.log('------------------------------------------');
+                            // console.log(GLOBAL_MSG.substring(c * size, (c + 1) * size));
+                            let end = GLOBAL_MSG.length - c * size;
+                            let start = end - size > 0 ? end - size : 0
+                            BarkNotify('简易通知-' + (k - c == k ? '结束' : (k - c)), GLOBAL_MSG.substring(start, end));
+                            await waitTime(1000);
+                        }
                         break;
                     }
                 }
@@ -327,7 +345,7 @@ function BarkNotify(title, content) {
                 console.log(response.data);
             }).catch(function (error) {
                 console.log('Bark Error Response:');
-                console.log(error.data);
+                console.log(error);
             });
     }
 }
