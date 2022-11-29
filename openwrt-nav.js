@@ -159,20 +159,27 @@
         return tb;
     }
 
-    //
+    //pingvalue && usedvalue
     function checkPasswallNode() {
         $("button.opnav-check-used").click(async function () {
             let ckBts = document.querySelectorAll('input[type="button"][value="可用性测试"].cbi-button');
+            let pingValues = document.querySelectorAll('span.ping_value');
             let len = ckBts.length;
-            for (let i = 0; i < len; i++) {
-                $(ckBts[i]).trigger("click");
-                console.log("click" + i);
-                await sleep(100);
-                if (i == len - 1) {
-                    //loop done..
-                    // mostAvailability();
+            if (len == pingValues.length) {
+                for (let i = 0; i < len; i++) {
+                    let pv = $(pingValues[i]).text();
+                    if ('超时' != pv && '---' != pv) {
+                        $(ckBts[i]).trigger("click");
+                        console.log("click" + i);
+                        await sleep(400);
+                        if (i == len - 1) {
+                            //loop done..
+                            // mostAvailability();
+                        }
+                    }
                 }
             }
+
         });
     }
 
