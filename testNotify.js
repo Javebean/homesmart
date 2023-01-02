@@ -172,6 +172,7 @@ function readBytes(fd, buffer) {
     });
 }
 
+// https://betterprogramming.pub/a-memory-friendly-way-of-reading-files-in-node-js-a45ad0cc7bb6
 async function* generateChunks(filePath, size) {
     const sharedBuffer = Buffer.alloc(size);
     const stats = fs.statSync(filePath); // file details
