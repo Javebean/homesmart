@@ -6,6 +6,7 @@ import os
 cmdList = {
     "con": "adb connect 192.168.31.215",
     "dev": "adb devices",
+    "reboot": "adb reboot",
     "aks": "adb kill-server",
     "rem": "adb remount",
     "lp": "adb shell pm list packages",
@@ -15,13 +16,30 @@ cmdList = {
     "push": "adb push # /system/app",
 }
 findPackages = []
-
-auto = 0  # 自动根据下面的命令链来执行
-autoIndex = 0
-autoCheck = 'dev'  # 自动执行前，先检查下是否连接
-autoLpeIndex = 0
-autoLpe = ['set', 'browser', 'netaccessagent', 'newlauncher']
+autoLpe = ['com.zte', 'com.dangbei', 'com.vixtel']
 autoCommand = ['lpe', 'pull', 'rmlpe', 'push']
+
+
+def pullApk(cmd, apkArr):
+    # 把查出来的apk通过adb pull备份下
+    arr1 = list(map(lambda x: cmd.replace("#0", x), apkArr))
+    path = os.path.abspath("./apk_backup")
+    return list(map(lambda x: x.replace("#1", path), arr1))
+
+
+def doCmd(cmd):
+    print('执行的命令：\r\n', cmd)
+    obj = subprocess.Popen(cmd, shell=True, stdin=subprocess.PIPE,
+                           stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=False)
+    stdout_value, stderr_value = obj.communicate()
+    result = stdout_value.decode('utf-8')  # gbk
+    print('执行的命令结果：\r\n', result)
+    return result
+
+
+def checkAdbConnect():
+    result = doCmd('adb devices')
+    return "device" in result
 
 
 def getApkPath(result):
@@ -40,54 +58,76 @@ def dealPath(package):
     return path
 
 
-def pullApk(cmd, apkArr):
-    # 把查出来的apk通过adb pull备份下
-    arr1 = list(map(lambda x: cmd.replace("#0", x), apkArr))
-    path = os.path.abspath("./apk_backup")
-    return list(map(lambda x: x.replace("#1", path), arr1))
+def autoAdbShell():
+    print('请在原设置中开启有线网络、时间同步服务器、分辨率设置')
+    userInput = input('确认继续？: \n')
+    if userInput != 'y':
+        sys.exit(1)
+    # step0 准备工作
+    result = doCmd('adb connect 192.168.31.215')
+    if not checkAdbConnect():
+        sys.exit(1)
+
+    result = doCmd('adb remount')
+    # step1 根据关键字查询出packages
+    pmList = list(
+        map(lambda x: 'adb shell pm list packages -e "'+x+'"', autoLpe))
+    result = doCmd(' && '.join(pmList))
+
+    # setp2 根据packages再解析出app路径
+    appList = getApkPath(result)
+
+    # step3 先备份再删除
+    # backUpPath = os.path.abspath("./apk_backup")
+    # backUpCmdsArr = list(map(lambda x: 'adb pull '+x+' '+backUpPath, appList))
+    # doCmd(' && '.join(backUpCmdsArr))
+
+    # step4 删除解析出的app
+    doCmd('adb shell rm -rf ' + (' '.join(appList)))
+
+    # step5 安装到/system/app下
+    appArr0 = os.listdir('./stmApp/')
+    # files_path = [os.path.abspath('./stmApp/'+x) for x in appArr]
+    appAbsPathArr = list(
+        map(lambda x: os.path.abspath('./stmApp/'+x), appArr0))
+    doCmd('adb push '+' '.join(appAbsPathArr)+' /system/app')
 
 
-def doCmd(cmd):
-    obj = subprocess.Popen(cmd, shell=True, stdin=subprocess.PIPE,
-                           stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=False)
-    stdout_value, stderr_value = obj.communicate()
-    result = stdout_value.decode('utf-8')  # gbk
-    return result
+def rootDev():
+    doCmd('adb remount')
+    suPath = os.path.abspath("./SuperSU-v2.82-201705271822/armv7/su")
+    suApkPath = os.path.abspath(
+        "./SuperSU-v2.82-201705271822/common/Superuser.apk")
+    doCmd('adb push '+suApkPath+' /system/app/')
+    doCmd('adb push '+suPath+' /system/bin/')
+    doCmd('adb push '+suPath+' /system/xbin/')
+    doCmd('adb shell chmod 06755 /system/bin/su')
+    doCmd('adb shell chmod 06755 /system/xbin/su')
+    doCmd('adb shell /system/bin/su --install')
+    doCmd('adb shell /system/bin/su --daemon&')
 
-
-def checkAdbConnect():
-    result = doCmd('adb devices')
-    return "device" in result
-
-
-# for x in autoLpe:
-#     print(x)
-
+def installApp():
+    appArr0 = os.listdir('./install-app/')
+    # files_path = [os.path.abspath('./stmApp/'+x) for x in appArr]
+    appAbsPathArr = list(
+        map(lambda x: 'adb install '+os.path.abspath('./install-app/'+x), appArr0))
+    doCmd(' && '.join(appAbsPathArr))
 
 while True:
-    # 自动还是手动执行，自动执行需要提前自定义命令
-    if auto == 1:
-        if autoIndex < len(autoCommand):
-            userInput = autoCommand[autoIndex]
-            if userInput:
-                # 先检查设备是否连接
-                if checkAdbConnect():
-                    autoIndex += 1
-                else:
-                    print('auto自动检查设备未连接')
-                    break
-            else:
-                print('auto取到的命令为空,结束!')
-                break
-        else:
-            print('auto数组越界,结束! autoIndex:', autoIndex,
-                  ' 数组长度:', len(autoCommand))
-            break
-    else:
-        userInput = input('请输入命令的key: \n')
+    userInput = input('请输入命令的key: \n')
 
     if userInput == 'off':
         break
+
+    if userInput == 'auto':
+        autoAdbShell()
+        continue
+    if userInput == 'root':
+        rootDev()
+        continue
+    if userInput == 'install':
+        installApp()
+        continue
 
     # 检查输入命令是否合法
     if userInput in cmdList:
@@ -98,12 +138,8 @@ while True:
 
     # 命令自定义
     if userInput == "lpe":
-        if auto == 1:
-            cmdItem += ' "'+autoLpe[autoLpeIndex]+'"'
-            autoLpeIndex += 1
-        else:
-            findStr = input("请输入搜索的字符串。。。")
-            cmdItem += ' "'+findStr+'"'
+        findStr = input("请输入搜索的字符串。。。")
+        cmdItem += ' "'+findStr+'"'
     elif userInput == "rmlpe":
         cmdItem += " ".join(findPackages)
         print('危险！即将执行命令：', cmdItem)
