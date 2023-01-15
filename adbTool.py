@@ -108,10 +108,15 @@ def rootDev():
 
 def installApp():
     appArr0 = os.listdir('./install-app/')
-    # files_path = [os.path.abspath('./stmApp/'+x) for x in appArr]
     appAbsPathArr = list(
-        map(lambda x: 'adb install '+os.path.abspath('./install-app/'+x), appArr0))
+        map(lambda x: 'adb install -r -d '+os.path.abspath('./install-app/'+x), appArr0))
     doCmd(' && '.join(appAbsPathArr))
+    
+    # doCmd('adb shell mount -o rw,remount /')
+    doCmd('adb shell mkdir -p /sdcard/zzzapk/')
+    pushCmdArr = list(
+        map(lambda x: os.path.abspath('./install-app/'+x), appArr0))
+    doCmd('adb push '+' '.join(pushCmdArr)+' /sdcard/zzzapk/')
 
 while True:
     userInput = input('请输入命令的key: \n')
