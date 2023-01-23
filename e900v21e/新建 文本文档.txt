@@ -1,0 +1,23 @@
+root@TY1608:/ # cd /system/app
+root@TY1608:/system/app # ls -l | grep "Super"
+-rw-r--r-- root     root      1096897 2016-06-10 18:40 Superuser.apk
+root@TY1608:/system/app # cd /sys
+sys/    system/ 
+root@TY1608:/system/app # cd /system/xbin
+root@TY1608:/system/xbin # ls -l | grep "su"
+-rwxr-xr-x root     root        75364 2016-06-10 18:40 daemonsu
+lrwxrwxrwx root     root              2015-01-01 08:00 lsusb -> busybox
+lrwxrwxrwx root     root              2015-01-01 08:00 md5sum -> busybox
+-rwxr-xr-x root     root         1612 2015-01-01 08:00 otasurvival.sh
+lrwxrwxrwx root     root              2015-01-01 08:00 sha1sum -> busybox
+lrwxrwxrwx root     root              2015-01-01 08:00 sha256sum -> busybox
+lrwxrwxrwx root     root              2015-01-01 08:00 sha3sum -> busybox
+lrwxrwxrwx root     root              2015-01-01 08:00 sha512sum -> busybox
+-rwxr-xr-x root     root        75364 2016-06-10 18:40 su
+-rwxr-xr-x root     root       125420 2015-01-01 08:00 sugote
+-rwxr-xr-x root     root       214916 2015-01-01 08:00 sugote-mksh
+lrwxrwxrwx root     root              2015-01-01 08:00 sum -> busybox
+root@TY1608:/system/xbin # 
+
+
+Re 路径：/system/app

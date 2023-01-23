@@ -4,19 +4,22 @@ import sys
 import os
 
 cmdList = {
-    "con": "adb connect 192.168.31.215",
-    "dev": "adb devices",
+    "con": "adb connect 192.168.31.60 & adb devices & adb root & adb remount",
+    "dev": "adb devices & adb root & adb remount",
     "reboot": "adb reboot",
     "aks": "adb kill-server",
     "rem": "adb remount",
-    "lp": "adb shell pm list packages",
-    "lpe": "adb shell pm list packages -e",  # 搜出来的存到数组中等待删除
+    "pm": "adb shell pm list packages",
+    "lsa": "adb shell ls -l /system/app",
+    "lsp": "adb shell ls -l /system/priv-app",
+    "lsd": "adb shell ls -l /data/app",
     "rmlpe": "adb shell rm -rf ",
     "pull": "adb pull #0 #1",
     "push": "adb push # /system/app",
 }
 findPackages = []
-autoLpe = ['com.zte', 'com.dangbei', 'com.vixtel']
+autoLpe = ['kuaisou', 'com.yangqi', 'com.huawei']
+# autoLpe = ['com.zte', 'com.dangbei', 'com.vixtel']
 autoCommand = ['lpe', 'pull', 'rmlpe', 'push']
 
 
@@ -32,6 +35,23 @@ def doCmd(cmd):
     obj = subprocess.Popen(cmd, shell=True, stdin=subprocess.PIPE,
                            stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=False)
     stdout_value, stderr_value = obj.communicate()
+    result = stdout_value.decode('utf-8')  # gbk
+    print('执行的命令结果：\r\n', result)
+    return result
+
+def doShellCmd(cmd):
+    doCmd('adb root')
+    print('执行的命令：\r\n', cmd)
+    obj = subprocess.Popen('adb shell', shell=True, stdin=subprocess.PIPE,
+                           stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=False)
+
+    # value_is_string = isinstance(
+    #     stdout_value, str if sys.version_info[0] >= 3 else basestring)
+
+    
+
+    stdout_value, stderr_value = obj.communicate(("\n"+cmd+"\n exit \n").encode('utf-8'))
+    #stdout_value, stderr_value = obj.communicate(cmd)
     result = stdout_value.decode('utf-8')  # gbk
     print('执行的命令结果：\r\n', result)
     return result
@@ -58,20 +78,22 @@ def dealPath(package):
     return path
 
 
-def autoAdbShell():
+def autoSimplify():
     print('请在原设置中开启有线网络、时间同步服务器、分辨率设置')
     userInput = input('确认继续？: \n')
     if userInput != 'y':
         sys.exit(1)
+    ip4 = input('输入ip第四位？: \n')
+
     # step0 准备工作
-    result = doCmd('adb connect 192.168.31.215')
+    result = doCmd('adb connect 192.168.31.'+ip4)
     if not checkAdbConnect():
         sys.exit(1)
 
     result = doCmd('adb remount')
     # step1 根据关键字查询出packages
     pmList = list(
-        map(lambda x: 'adb shell pm list packages -e "'+x+'"', autoLpe))
+        map(lambda x: 'adb shell pm list packages -f -e "'+x+'"', autoLpe))
     result = doCmd(' && '.join(pmList))
 
     # setp2 根据packages再解析出app路径
@@ -111,27 +133,43 @@ def installApp():
     appAbsPathArr = list(
         map(lambda x: 'adb install -r -d '+os.path.abspath('./install-app/'+x), appArr0))
     doCmd(' && '.join(appAbsPathArr))
-    
+
     # doCmd('adb shell mount -o rw,remount /')
     doCmd('adb shell mkdir -p /sdcard/zzzapk/')
     pushCmdArr = list(
         map(lambda x: os.path.abspath('./install-app/'+x), appArr0))
     doCmd('adb push '+' '.join(pushCmdArr)+' /sdcard/zzzapk/')
 
+#https://itlanyan.com/grep-invert-match-multiple-strings/
+def rmSpecifyPathFile(cmd):
+    doShellCmd('pm list packages | grep -v "com.android"')
+    
+    # print(cmd)
+    # keyArr = cmd.split("#")
+    # keyArr.pop(0)
+    # for k in keyArr:
+    #     print(k)
+    #     findCmd = 'find /system/app /system/priv-app /data/app -path "*'+k+'*" -exec rm -rf {} +'
+    #     doShellCmd((findCmd))
+
+
 while True:
     userInput = input('请输入命令的key: \n')
 
-    if userInput == 'off':
+    if userInput == 'q':
         break
 
     if userInput == 'auto':
-        autoAdbShell()
+        autoSimplify()
         continue
     if userInput == 'root':
         rootDev()
         continue
     if userInput == 'install':
         installApp()
+        continue
+    if userInput.startswith('rm'):
+        rmSpecifyPathFile(userInput)
         continue
 
     # 检查输入命令是否合法
