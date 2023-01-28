@@ -2,9 +2,9 @@ import shlex
 import subprocess
 import sys
 import os
-
+IP = '192.168.31.'
 cmdList = {
-    "con": "adb connect 192.168.31.60 & adb devices & adb root & adb remount",
+    "con": "adb connect 192.168.31.215 & adb devices & adb root & adb remount",
     "dev": "adb devices & adb root & adb remount",
     "reboot": "adb reboot",
     "aks": "adb kill-server",
