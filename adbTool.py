@@ -9,7 +9,7 @@ cmdList = {
     "reboot": "adb reboot",
     "aks": "adb kill-server",
     "rem": "adb remount",
-    "pm": "adb shell pm list packages",
+    "pmlist": "adb shell pm list packages -f",
     "lsa": "adb shell ls -l /system/app",
     "lsp": "adb shell ls -l /system/priv-app",
     "lsd": "adb shell ls -l /data/app",
@@ -39,6 +39,7 @@ def doCmd(cmd):
     print('执行的命令结果：\r\n', result)
     return result
 
+
 def doShellCmd(cmd):
     doCmd('adb root')
     print('执行的命令：\r\n', cmd)
@@ -48,10 +49,9 @@ def doShellCmd(cmd):
     # value_is_string = isinstance(
     #     stdout_value, str if sys.version_info[0] >= 3 else basestring)
 
-    
-
-    stdout_value, stderr_value = obj.communicate(("\n"+cmd+"\n exit \n").encode('utf-8'))
-    #stdout_value, stderr_value = obj.communicate(cmd)
+    stdout_value, stderr_value = obj.communicate(
+        ("\n"+cmd+"\n exit \n").encode('utf-8'))
+    # stdout_value, stderr_value = obj.communicate(cmd)
     result = stdout_value.decode('utf-8')  # gbk
     print('执行的命令结果：\r\n', result)
     return result
@@ -62,20 +62,26 @@ def checkAdbConnect():
     return "device" in result
 
 
-def getApkPath(result):
-    findPackages = result.split('\r\r\n')
+def getApkPathList(result):
+    lines = result.split('\r\r\n')
+    str_list = list(map(getApkPath, lines))
     # 去除数组中的空元素 https://stackoverflow.com/a/3845453
-    str_list = list(filter(None, findPackages))
-    return list(map(dealPath, str_list))
+    str_list = list(filter(None, str_list))
+    return str_list
 
 
-def dealPath(package):
-    # 处理每一行的packages 得到apk路径
-    index1 = package.find('package:')
-    index2 = package.find('.apk')
-    index2 = index2+4 if index2 > -1 else index2
-    path = package[index1+8:index2]
-    return path
+def getApkPath(line):
+    if line.startswith('package:'):
+        index = line.find('apk=')
+        packageName = line[index+4:]
+        if not packageName.startswith('com.android') and not packageName.startswith('android'):
+            print('即将删除的非系统apk:',packageName)
+            apkPath = line[8:index+3]
+            return apkPath
+        else:
+            return None
+    else:
+        return None
 
 
 def autoSimplify():
@@ -91,13 +97,13 @@ def autoSimplify():
         sys.exit(1)
 
     result = doCmd('adb remount')
-    # step1 根据关键字查询出packages
+    # step1 用&&组装查询语句
     pmList = list(
         map(lambda x: 'adb shell pm list packages -f -e "'+x+'"', autoLpe))
     result = doCmd(' && '.join(pmList))
 
     # setp2 根据packages再解析出app路径
-    appList = getApkPath(result)
+    appList = getApkPathList(result)
 
     # step3 先备份再删除
     # backUpPath = os.path.abspath("./apk_backup")
@@ -115,6 +121,50 @@ def autoSimplify():
     doCmd('adb push '+' '.join(appAbsPathArr)+' /system/app')
 
 
+def autoSimplify2():
+    ip4 = input('输入ip第四位？: \n')
+    # step0 准备工作
+    result = doCmd('adb connect 192.168.31.'+ip4)
+    if not checkAdbConnect():
+        sys.exit(1)
+
+    result = doCmd('adb root & adb remount')
+
+
+    if "remount succeeded" not in result:
+        print('result:',result)
+        userInput = input('确认继续？')
+        #sys.exit(1)
+
+    # step5 安装到/system/app下
+    appArr0 = os.listdir('./stmApp/')
+    # files_path = [os.path.abspath('./stmApp/'+x) for x in appArr]
+    appAbsPathArr = list(
+        map(lambda x: os.path.abspath('./stmApp/'+x), appArr0))
+    doCmd('adb push '+' '.join(appAbsPathArr)+' /data/app')
+
+    
+    result = doCmd('adb root & adb remount')
+
+    if "remount succeeded" not in result:
+        print('result:',result)
+        userInput = input('确认继续？')
+        #sys.exit(1)
+
+    # step1 查询系统所有安装包
+    result = doCmd('adb shell pm list packages -f')
+
+    # setp2 根据packages再解析出app路径
+    appList = getApkPathList(result)
+    
+    # step4 删除解析出的app
+    print(appList)
+    if appList:
+        #print('adb shell rm -rf ' + (' '.join(appList)))
+        doCmd('adb shell rm -rf ' + (' '.join(appList)))
+
+
+
 def rootDev():
     doCmd('adb remount')
     suPath = os.path.abspath("./SuperSU-v2.82-201705271822/armv7/su")
@@ -128,6 +178,7 @@ def rootDev():
     doCmd('adb shell /system/bin/su --install')
     doCmd('adb shell /system/bin/su --daemon&')
 
+
 def installApp():
     appArr0 = os.listdir('./install-app/')
     appAbsPathArr = list(
@@ -140,10 +191,12 @@ def installApp():
         map(lambda x: os.path.abspath('./install-app/'+x), appArr0))
     doCmd('adb push '+' '.join(pushCmdArr)+' /sdcard/zzzapk/')
 
-#https://itlanyan.com/grep-invert-match-multiple-strings/
+# https://itlanyan.com/grep-invert-match-multiple-strings/
+
+
 def rmSpecifyPathFile(cmd):
     doShellCmd('pm list packages | grep -v "com.android"')
-    
+
     # print(cmd)
     # keyArr = cmd.split("#")
     # keyArr.pop(0)
@@ -161,6 +214,9 @@ while True:
 
     if userInput == 'auto':
         autoSimplify()
+        continue
+    if userInput == 'auto2':
+        autoSimplify2()
         continue
     if userInput == 'root':
         rootDev()
@@ -235,5 +291,5 @@ while True:
     else:
         result = stdout_value.decode('utf-8')  # gbk
         if userInput == "lpe":
-            findPackages = getApkPath(result)
+            findPackages = getApkPathList(result)
         print('输出结果：\n', result)

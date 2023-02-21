@@ -13,8 +13,14 @@ const qlLogPath = '/ql/data/log/';
 const timeStamp = getTodayDateStr(true);
 let timeStampRead;
 
-//项目白名单
-let WHITELIST = ['6dylan6_jdpro'];
+//启用通知的项目
+let NOTIFY_PRO = ['6dylan6_jdpro'];
+
+let MODE = 0;// 0:WHITE 1:BLACK
+let WHITELIST = [
+    'jd_fruit'
+];
+
 //日志黑名单
 let BLACKLIST = [
     'testNotify',
@@ -25,6 +31,12 @@ let BLACKLIST = [
     'jd_wish',//
     'jd_beauty',//
     'jd_xinruimz',//
+    'jd_mf_new',//魔方
+    'jd_superBrandZII',//特务
+    'jd_superBrandStar',//特务
+    'jd_twjk_new.js',//特务
+    'jd_SuperBrandJXZ',//特务
+    'jd_sign_graphics1',//特务
 ];
 
 //level 0：简易通知，只显示知否完成
@@ -73,18 +85,23 @@ function writeExeTime(f) {
 function loopLogDirs() {
     fs.readdir(qlLogPath, (err, LogDirs) => {
         if (!err) {
-            //hit white list
-            let filterLogDirs = LogDirs.filter(curLogFolder => hitWhiteList(curLogFolder, WHITELIST));
+            //hit need notify project list
+            let filterLogDirs = LogDirs.filter(curLogFolder => hitNotifyPro(curLogFolder, NOTIFY_PRO));
 
-            //filter black list
-            filterLogDirs = filterLogDirs.filter(curLogFolder => !hitBlackList(curLogFolder, BLACKLIST));
+            //filter white/black list
+            if (MODE == 0) {
+                filterLogDirs = filterLogDirs.filter(curLogFolder => filterList(curLogFolder, WHITELIST));
+            } else {
+                filterLogDirs = filterLogDirs.filter(curLogFolder => !filterList(curLogFolder, BLACKLIST));
+            }
+
             // console.log(filterLogDirs);
             let len = filterLogDirs.length;
             if (len == 0) {
                 console.log('no log folders');
                 return;
             }
-            console.log('will scan log folder nums:' + len + ', base log folder is:[' + WHITELIST + ']');
+            console.log('will scan log folder nums:' + len + ', base log folder is:[' + NOTIFY_PRO + ']');
             for (let i = 0; i < len; i++) {
                 let folderName = filterLogDirs[i];
                 readLogFilesInDir(folderName);
@@ -120,13 +137,13 @@ function readLogFilesInDir(folderName) {
 }
 
 // hit white list
-function hitWhiteList(curLogFolder, whiteList) {
-    return whiteList.some(x => curLogFolder.indexOf(x) > -1);
+function hitNotifyPro(curLogFolder, projects) {
+    return projects.some(x => curLogFolder.indexOf(x) > -1);
 }
 
 // hit black list
-function hitBlackList(curLogFolder, blackList) {
-    return blackList.some(x => curLogFolder.indexOf(x) > -1);
+function filterList(curLogFolder, list) {
+    return list.some(x => curLogFolder.indexOf(x) > -1);
 }
 
 function readSingleLog(filePath, descriptor) {
@@ -256,21 +273,29 @@ function getTitleInFile(data) {
         if (shouldSkip) {
             return;
         }
+        if (!line) {
+            // console.log('空行continue');
+            return;
+        }
+        // console.log('^^^'+line+'^^^^');
         if (line.indexOf(', 开始!') > 0) {
+            console.log('打印日志开始');
             obj.title = line;
         }
 
         if (accountSimpleCount > 0) {
             accountSimpleCount--;
-            obj.accountSimpleLine = obj.accountSimpleLine + line + os.EOL + os.EOL;
-        }
-        if (line.indexOf('开始【京东账号') > 0) {
-            // console.log(line);
-            obj.accountSimpleLine = (obj.accountSimpleLine || '') + line + os.EOL;
-            accountSimpleCount = 5;
+            obj.accountSimpleLine = obj.accountSimpleLine + line + os.EOL;
         }
 
-        if (line.indexOf('执行结束') > 0) {
+        if (line.indexOf('开始【京东账号') > -1) {
+            console.log('京东账号:' + line);
+            obj.accountSimpleLine = (obj.accountSimpleLine || '') + line + os.EOL;
+            accountSimpleCount = 10;
+        }
+
+        if (line.indexOf('执行结束') > -1) {
+            console.log('执行结束')
             obj.endLine = line;
             shouldSkip = true;
         }
@@ -286,9 +311,9 @@ let lastLogCount = -1;
 let checkTimes = 0;//多次检测 logCount不再增长的话，说明这次遍历结束
 let checkStart = false;
 async function scheduleSendNotify(keyObj, content) {
-    console.log('触发scheduleSendNotify :' + logCount);
+    console.log('触发scheduleSendNotify :' + keyObj.accountSimpleLine);
     if (GLOBAL_LEVEL == GLOBAL_LEVEL_0) {
-        GLOBAL_MSG += keyObj.title + os.EOL + keyObj.accountSimpleLine + keyObj.endLine + os.EOL + os.EOL;
+        GLOBAL_MSG += keyObj.title + os.EOL + keyObj.accountSimpleLine + keyObj.endLine;
         if (!checkStart) {
             checkStart = true
             for (var i = 0; i < 100; i++) {
@@ -328,7 +353,7 @@ function BarkNotify(title, content) {
     if (BARK_PUSH) {
         const options = {
             url: 'https://api.day.app/**',
-            body: desp,
+            body: content,
             title: title,
             group: 'QingLong',
             icon: 'http://day.app/assets/images/avatar.jpg',
