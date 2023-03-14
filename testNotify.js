@@ -1,15 +1,14 @@
 ///mnt/mmcblk2p4/ql/data/scripts/
 const fs = require('fs');
+const readline = require('readline');
 let os = require('os');
 const axios = require('axios');
 const BARK_PUSH = true;
+const BARK_CODE = "**"
 const timeout = 15000;
-let logCount = 0;
-
-const CHUNK_SIZE = 4000;
 
 // QingLong log path
-const qlLogPath = '/ql/data/log/';
+const qlLogPath = '../log/';
 const timeStamp = getTodayDateStr(true);
 let timeStampRead;
 
@@ -18,8 +17,22 @@ let NOTIFY_PRO = ['6dylan6_jdpro'];
 
 let MODE = 0;// 0:WHITE 1:BLACK
 let WHITELIST = [
-    'jd_fruit'
+    'jd_fruit',
+    'jd_speed_sign',
+    'jd_speed_signfree',
 ];
+
+let WHITELIST_MODE_INDEX = [
+    1,
+    0,
+    2,
+];
+
+let WHITELIST_MODE = [
+    { 'start': "系统通知", 'end': ', 结束' },
+    { 'start': "系统通知", 'end': '开始【京东账号' },
+    { 'start': "开始【京东账号", 'end': '系统通知' },
+]
 
 //日志黑名单
 let BLACKLIST = [
@@ -42,34 +55,42 @@ let BLACKLIST = [
 //level 0：简易通知，只显示知否完成
 //level 1: 完整通知
 const GLOBAL_LEVEL_0 = 0;
-const GLOBAL_LEVEL_1 = 1;
-let GLOBAL_MSG = '';
 let GLOBAL_LEVEL = GLOBAL_LEVEL_0;
 
-fs.readFile(__dirname + '/notifyTimeLog.txt', function (err, data) {
-    if (err) {
-        console.log(err);
-        // timeStampRead = getTodayDateStr(1, -2);
-    } else {
-        const arr = data.toString().replace(/\r\n/g, '\n').split('\n');
-        console.log(arr);
-        for (let i = arr.length - 1; i >= 0; i--) {
-            if (arr[i] && arr[i].length > 4) {
-                timeStampRead = arr[i];//倒序选择第一个时间
-                // timeStampRead = '2022-11-23-15-12-46';
-                break;
-            }
-        }
 
-        if (timeStampRead) {
-            console.log('上次通知的时间戳: ' + timeStampRead)
-            loopLogDirs();
+// test
+// processLineByLine(__dirname + '/2023-03-13-06-18-13.log')
+// processLineByLine(__dirname + '/jd_speed_signfree.log')
+// prod
+taskStart()
+
+function taskStart() {
+    fs.readFile(__dirname + '/notifyTimeLog.txt', function (err, data) {
+        if (err) {
+            console.log(err);
+            // timeStampRead = getTodayDateStr(1, -2);
         } else {
-            console.error('错误的时间戳: ' + timeStampRead)
+            const arr = data.toString().replace(/\r\n/g, '\n').split('\n');
+            console.log(arr);
+            for (let i = arr.length - 1; i >= 0; i--) {
+                if (arr[i] && arr[i].length > 4) {
+                    timeStampRead = arr[i];//倒序选择第一个时间
+                    // timeStampRead = '2022-11-23-15-12-46';
+                    break;
+                }
+            }
+
+            if (timeStampRead) {
+                console.log('上次通知的时间戳: ' + timeStampRead)
+                loopLogDirs();
+            } else {
+                console.error('错误的时间戳: ' + timeStampRead)
+            }
+            writeExeTime(arr.length > 50 ? 'w' : 'a');
         }
-        writeExeTime(arr.length > 50 ? 'w' : 'a');
-    }
-});
+    });
+}
+
 
 function writeExeTime(f) {
     // 将数据写入文件sample.html
@@ -136,102 +157,73 @@ function readLogFilesInDir(folderName) {
     });
 }
 
-// hit white list
-function hitNotifyPro(curLogFolder, projects) {
-    return projects.some(x => curLogFolder.indexOf(x) > -1);
-}
 
-// hit black list
-function filterList(curLogFolder, list) {
-    return list.some(x => curLogFolder.indexOf(x) > -1);
-}
 
-function readSingleLog(filePath, descriptor) {
-    fs.stat(filePath, (err, stats) => {
-        if (err) {
-            console.log(`File doesn't exist.`)
-        } else {
-            if (GLOBAL_LEVEL == GLOBAL_LEVEL_0 || stats.size < CHUNK_SIZE) { //4096byte = 4KB
-                fs.readFile(filePath, { encoding: 'utf-8' }, function (err, content) {
-                    if (!err) {
-                        // console.log(filePath);
-                        // console.log('Log Content ：\r\n' + data);
-                        let keyObj = getTitleInFile(content);
-                        keyObj.title = keyObj.title || descriptor;
-                        logCount++;
-                        scheduleSendNotify(keyObj, content)
-                    } else {
-                        console.log(err);
-                    }
-                });
-            } else {
-                // console.log(stats)
-                // send message separate
-                readPart(filePath, descriptor);
-            }
-        }
-    })
-}
+// readFile line by line
+async function processLineByLine(filePath) {
+    console.log(filePath);
+    const fileStream = fs.createReadStream(filePath);
 
-function readBytes(fd, buffer) {
-    return new Promise((resolve, reject) => {
-        fs.read(
-            fd,
-            buffer,
-            0,
-            buffer.length,
-            null,
-            (err) => {
-                if (err) { return reject(err); }
-                resolve();
-            }
-        );
+    const rl = readline.createInterface({
+        input: fileStream,
+        crlfDelay: Infinity
     });
-}
+    // Note: we use the crlfDelay option to recognize all instances of CR LF
+    // ('\r\n') in input.txt as a single line break.
 
-// https://betterprogramming.pub/a-memory-friendly-way-of-reading-files-in-node-js-a45ad0cc7bb6
-async function* generateChunks(filePath, size) {
-    const sharedBuffer = Buffer.alloc(size);
-    const stats = fs.statSync(filePath); // file details
-    const fd = fs.openSync(filePath); // file descriptor
-    let bytesRead = 0; // how many bytes were read
-    let end = size;
+    let obj = {};
+    let accountSimpleCount = -1;
 
-    for (let i = 0; i < Math.ceil(stats.size / size); i++) {
-        await readBytes(fd, sharedBuffer);
-        bytesRead = (i + 1) * size;
-        if (bytesRead > stats.size) {
-            // When we reach the end of file, 
-            // we have to calculate how many bytes were actually read
-            end = size - (bytesRead - stats.size);
-        }
-        yield sharedBuffer.slice(0, end);
+    let mode = whichMode(filePath);
+    if (!mode) {
+        console.log('没有解析模板，直接返回', filePath);
+        return;
     }
-}
+    console.log('使用该模板：', filePath, mode);
 
-async function readPart(file, descriptor) {
-    let index = 0;
-    let isFindTitle = false;
-    let title;
-    for await (const chunk of generateChunks(file, CHUNK_SIZE)) {
-        if (!isFindTitle) {
-            title = getTitleInFile(chunk.toString());
-            if (!title) {
-                title = descriptor;
-            } else {
-                isFindTitle = true;
+    for await (const line of rl) {
+        // console.log(`Line from file: ${line}`);
+        if (!line) {
+            // console.log('空行continue');
+            continue;
+        }
+        // console.log('^^^'+line+'^^^^');
+        if (line.indexOf(', 开始!') > -1) {
+            console.log('遍历日志开始');
+            obj.title = line;
+        }
+
+        if (accountSimpleCount > 0) {
+            if (line.indexOf(mode.end) > -1) {
+                accountSimpleCount = -1;
+                continue;
             }
+            accountSimpleCount--;
+            obj.notifyContent = obj.notifyContent + line + os.EOL;
         }
-        index++;
-        BarkNotify(title + '-' + index, chunk.toString());
-        await waitTime(0);
+
+        if (accountSimpleCount == -1 && line.indexOf(mode.start) > -1) {
+            // console.log('京东账号:' + line);
+            obj.notifyContent = (obj.notifyContent || '') + line + os.EOL;
+            accountSimpleCount = 100;
+        }
+
+        if (line.indexOf('执行结束') > -1) {
+            console.log('遍历日志结束')
+            obj.endLine = line;
+        }
     }
+    console.log("输出结果：", obj);
+    BarkNotify(obj.title, obj.notifyContent + obj.endLine);
 }
 
-const waitTime = (WAIT_TIME) => {
-    return new Promise(resolve => {
-        setTimeout(resolve, WAIT_TIME)
-    });
+function whichMode(filePath) {
+    for (let i = 0; i < WHITELIST.length; i++) {
+        if (filePath.indexOf(WHITELIST[i] + '/') > -1) {
+            modeIndex = WHITELIST_MODE_INDEX[i];
+            return WHITELIST_MODE[modeIndex]
+        }
+    }
 }
 
 function getTodayDateStr(time, offset) {
@@ -257,93 +249,23 @@ function getTodayDateStr(time, offset) {
     return newdate;
 }
 
-
-
 function paddingZero(v) {
     v += '';
     return v.length == 1 ? '0' + v : v;
 }
 
-// https://masteringjs.io/tutorials/fundamentals/foreach-break
-function getTitleInFile(data) {
-    let obj = {};
-    let shouldSkip = false;
-    let accountSimpleCount = -1;
-    data.split(/\r?\n/).forEach(function (line) {
-        if (shouldSkip) {
-            return;
-        }
-        if (!line) {
-            // console.log('空行continue');
-            return;
-        }
-        // console.log('^^^'+line+'^^^^');
-        if (line.indexOf(', 开始!') > 0) {
-            console.log('打印日志开始');
-            obj.title = line;
-        }
-
-        if (accountSimpleCount > 0) {
-            accountSimpleCount--;
-            obj.accountSimpleLine = obj.accountSimpleLine + line + os.EOL;
-        }
-
-        if (line.indexOf('开始【京东账号') > -1) {
-            console.log('京东账号:' + line);
-            obj.accountSimpleLine = (obj.accountSimpleLine || '') + line + os.EOL;
-            accountSimpleCount = 10;
-        }
-
-        if (line.indexOf('执行结束') > -1) {
-            console.log('执行结束')
-            obj.endLine = line;
-            shouldSkip = true;
-        }
-
-        if (shouldSkip) {
-            return;
-        }
-    })
-    return obj;
+// hit white list
+function hitNotifyPro(curLogFolder, projects) {
+    return projects.some(x => curLogFolder.indexOf(x) > -1);
 }
 
-let lastLogCount = -1;
-let checkTimes = 0;//多次检测 logCount不再增长的话，说明这次遍历结束
-let checkStart = false;
-async function scheduleSendNotify(keyObj, content) {
-    console.log('触发scheduleSendNotify :' + keyObj.accountSimpleLine);
-    if (GLOBAL_LEVEL == GLOBAL_LEVEL_0) {
-        GLOBAL_MSG += keyObj.title + os.EOL + keyObj.accountSimpleLine + keyObj.endLine;
-        if (!checkStart) {
-            checkStart = true
-            for (var i = 0; i < 100; i++) {
-                if (logCount != lastLogCount) {
-                    lastLogCount = logCount;
-                    console.log('检测次数 :' + i + ', logCount:' + logCount + ', lastLogCount:' + lastLogCount);
-                } else {
-                    checkTimes++
-                    console.log('检测次数(不变) :' + i + ', logCount:' + logCount + ', lastLogCount:' + lastLogCount);
-                    if (checkTimes == 3) {
-                        var size = 1000; //length ≠ byte size
-                        var k = Math.ceil(GLOBAL_MSG.length / size);
-                        console.log(k, GLOBAL_MSG.length);
-                        for (var c = 0; c < k; c++) {
-                            // console.log('------------------------------------------');
-                            // console.log(GLOBAL_MSG.substring(c * size, (c + 1) * size));
-                            let end = GLOBAL_MSG.length - c * size;
-                            let start = end - size > 0 ? end - size : 0
-                            BarkNotify('简易通知-' + (k - c == k ? '结束' : (k - c)), GLOBAL_MSG.substring(start, end));
-                            await waitTime(1000);
-                        }
-                        break;
-                    }
-                }
-                await waitTime(1000);
-            }
-        }
-    } else {
-        BarkNotify(keyObj.title, content);
-    }
+// hit black list
+function filterList(curLogFolder, list) {
+    return list.some(x => curLogFolder.indexOf(x) > -1);
+}
+
+function readSingleLog(filePath, descriptor) {
+    processLineByLine(filePath);
 }
 
 function BarkNotify(title, content) {
@@ -352,7 +274,7 @@ function BarkNotify(title, content) {
     }
     if (BARK_PUSH) {
         const options = {
-            url: 'https://api.day.app/**',
+            url: 'https://api.day.app/' + BARK_CODE,
             body: content,
             title: title,
             group: 'QingLong',
