@@ -9,7 +9,7 @@ const timeout = 15000;
 
 // QingLong log path
 const qlLogPath = '../log/';
-const timeStamp = getTodayDateStr(true);
+const timeStamp = getTodayDateStr();
 let timeStampRead;
 
 //启用通知的项目
@@ -17,21 +17,15 @@ let NOTIFY_PRO = ['6dylan6_jdpro'];
 
 let MODE = 0;// 0:WHITE 1:BLACK
 let WHITELIST = [
-    'jd_fruit',
-    'jd_speed_sign',
-    'jd_speed_signfree',
-];
-
-let WHITELIST_MODE_INDEX = [
-    1,
-    0,
-    2,
+    'jd_fruit#1',
+    'jd_speed_sign#0',
+    'jd_speed_signfree#2',
 ];
 
 let WHITELIST_MODE = [
-    { 'start': "系统通知", 'end': ', 结束' },
-    { 'start': "系统通知", 'end': '开始【京东账号' },
-    { 'start': "开始【京东账号", 'end': '系统通知' },
+    { 'start': "系统通知", 'end': ', 结束', 'block': [] },
+    { 'start': "系统通知", 'end': '开始【京东账号', 'block': [] },
+    { 'start': "开始【京东账号", 'end': '系统通知', 'block': ['脚本也许随时失效,请注意', '没有需要签到的'] },
 ]
 
 //日志黑名单
@@ -99,7 +93,7 @@ function writeExeTime(f) {
         function (err) {
             if (err) throw err;
             // 如果没有错误
-            console.log('logdate is written to file successfully: ' + timeStamp)
+            console.log('本次通知时间写入成功: ' + timeStamp)
         });
 }
 
@@ -119,7 +113,7 @@ function loopLogDirs() {
             // console.log(filterLogDirs);
             let len = filterLogDirs.length;
             if (len == 0) {
-                console.log('no log folders');
+                console.log('没有扫描到需要发送的通知');
                 return;
             }
             console.log('will scan log folder nums:' + len + ', base log folder is:[' + NOTIFY_PRO + ']');
@@ -187,6 +181,15 @@ async function processLineByLine(filePath) {
             // console.log('空行continue');
             continue;
         }
+
+        if (mode.block && mode.block.length > 0) {
+            let blockArr = mode.block;
+
+            if (blockArr.some(x => line.indexOf(x) > -1)) {
+                continue;
+            }
+        }
+
         // console.log('^^^'+line+'^^^^');
         if (line.indexOf(', 开始!') > -1) {
             console.log('遍历日志开始');
@@ -214,19 +217,32 @@ async function processLineByLine(filePath) {
         }
     }
     console.log("输出结果：", obj);
-    BarkNotify(obj.title, obj.notifyContent + obj.endLine);
+    BarkNotify(getTodayDateStr(2) + ' ' + obj.title, obj.notifyContent + obj.endLine);
 }
 
 function whichMode(filePath) {
-    for (let i = 0; i < WHITELIST.length; i++) {
-        if (filePath.indexOf(WHITELIST[i] + '/') > -1) {
-            modeIndex = WHITELIST_MODE_INDEX[i];
+    for (const item of WHITELIST) {
+        let name = item.split('#')[0];
+        let modeIndex = item.split('#')[1];
+        console.log(name, modeIndex)
+        if (filePath.indexOf(name + '/') > -1) {
             return WHITELIST_MODE[modeIndex]
         }
     }
 }
 
-function getTodayDateStr(time, offset) {
+// format 0/undefined 2023-03-19 11:40:23
+// format 1 : 2023-03-19
+// format 2 : 03-19
+function getTodayDateStr(format, offset) {
+    let need_year = true, need_time = true;
+    if (format == 1) {
+        need_time = false;
+    } else if (format == 2) {
+        need_time = false;
+        need_year = false;
+    }
+
     let dateObj = new Date();
     if (offset) {
         dateObj.setHours(dateObj.getHours() + offset);
@@ -236,8 +252,12 @@ function getTodayDateStr(time, offset) {
     let day = dateObj.getDate();
     month = paddingZero(month);
     day = paddingZero(day);
-    let newdate = year + '-' + month + '-' + day;
-    if (time) {
+    let newdate = month + '-' + day;
+
+    if (need_year) {
+        newdate = year + '-' + newdate;
+    }
+    if (need_time) {
         let hour = dateObj.getHours();
         let minutes = dateObj.getMinutes();
         let seconds = dateObj.getSeconds();
@@ -261,7 +281,7 @@ function hitNotifyPro(curLogFolder, projects) {
 
 // hit black list
 function filterList(curLogFolder, list) {
-    return list.some(x => curLogFolder.indexOf(x) > -1);
+    return list.some(x => curLogFolder.indexOf(x.split('#')[0]) > -1);
 }
 
 function readSingleLog(filePath, descriptor) {
