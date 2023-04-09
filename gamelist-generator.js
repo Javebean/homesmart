@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-let basePath = 'D:\\Downloads\\emuelec-games\\';
+let basePath = 'D://Downloads/emuelec-games';
 let allgame = '';
 
 traverseFolder(basePath);
@@ -10,16 +10,32 @@ function traverseFolder(folderPath) {
     folderList.forEach(item => {
         if (item.isDirectory()) {
             traverseFolder(`${folderPath}/${item.name}`);
+            //这里判断第一层目录是模拟器，如nes,sfc
+            //遍历完nes里面的所有文件及子文件夹中文件夹后，写入gamelist
+            if (path.resolve(folderPath) === path.resolve(basePath)) {
+                let allgameXml = createGameList(allgame);
+                try {
+                    fs.writeFileSync(`${folderPath}/${item.name}` + '/gamelist.xml', allgameXml, 'utf8');
+                    console.log('File written successfully!' + `${folderPath}/${item.name}` + '/gamelist.xml');
+                    //每次模拟器文件夹重新开始遍历
+                    allgame = '';
+                } catch (error) {
+                    console.error(error);
+                }
+            }
         } else {
-            gamepath = path.relative(basePath, `${folderPath}/${item.name}`);
+            if (item.name == 'gamelist.xml') {
+                return;
+            }
+            //这里解析把D://Downloads/emuelec-games/nes/超级马里奥RPG - 七星传奇.zip
+            //解析成./超级马里奥RPG - 七星传奇.zip
+            gamepath = (folderPath+'/'+item.name).replace(basePath, '')
+            gamepath = '.'+gamepath.substr(gamepath.indexOf('/',1))
             gamename = path.parse(item.name).name;
             let onegame = createGameItem(gamepath, gamename, '', '', '');
             allgame += onegame;
-
         }
     });
-    let allgameXml = createGameList(allgame);
-    console.log(allgameXml);
 }
 
 function createGameList(allItemStr) {
