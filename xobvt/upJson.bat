@@ -18,3 +18,12 @@ if exist "%filePath%" (
 ) else (
   echo Error downloading file.
 )
+
+
+set "repository_url=https://github.com/liu673cn/box.git"
+set "folder_name=sub"
+
+git clone --depth=1 --single-branch %repository_url% temp_repo
+xcopy /E /Y temp_repo\%folder_name% .\%folder_name%\
+rmdir /S /Q temp_repo
+
