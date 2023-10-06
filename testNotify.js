@@ -19,17 +19,23 @@ let MODE = 0; // 0:WHITE 1:BLACK
 let WHITELIST = [
     'jd_fruit#1',
     'jd_speed_sign#0',
+    'jd_dwapp#3',//积分话费
+    'jx_joypark_task#4',
+    'jd_wxttzq#3',
     //    'jd_speed_signfree#2',
 ];
 
+// [start,end)
 let WHITELIST_MODE = [
-    { start: '系统通知', end: ', 结束', block: [] },
-    { start: '系统通知', end: '开始【京东账号', block: [] },
+    { start: '正常运行中', end: [', 结束'], skip: ['任务完成','记录成功','气泡收取成功'] },
+    { start: '系统通知', end: ['【预测】','已可领取','重新登录'], skip: ['东东农场','水果名称','已兑换','剩余水滴','领取失败'] },
     {
         start: '开始【京东账号',
         end: '系统通知',
-        block: ['脚本也许随时失效,请注意', '没有需要签到的'],
+        skip: ['脚本也许随时失效,请注意', '没有需要签到的'],
     },
+    { start: '开始【京东账号', end: [', 结束!'], skip: ['去做','领取任务','去领积分','已完成浏览','领取成功','去签到'] },
+    { start: '开始内部互助', end: ['没有可用于助力的ck'], skip: ['账号'] },
 ];
 
 //日志黑名单
@@ -105,7 +111,7 @@ function loopLogDirs() {
         if (!err) {
             //hit need notify project list
             let filterLogDirs = LogDirs.filter((curLogFolder) =>
-                hitNotifyPro(curLogFolder, NOTIFY_PRO)
+                someOfArr(curLogFolder, NOTIFY_PRO)
             );
 
             //filter white/black list
@@ -119,19 +125,20 @@ function loopLogDirs() {
                 );
             }
 
-            // console.log(filterLogDirs);
+            console.log('即将在['+NOTIFY_PRO+']中扫描以下日志文件夹：');
+            console.log(filterLogDirs);
             let len = filterLogDirs.length;
             if (len == 0) {
-                console.log('没有扫描到需要发送的通知');
+                console.log('没有扫描的日志文件夹');
                 return;
             }
-            console.log(
-                'will scan log folder nums:' +
-                len +
-                ', base log folder is:[' +
-                NOTIFY_PRO +
-                ']'
+
+
+            BarkNotify(
+                getTodayDateStr(2) + ' 服务器检测',
+                '服务器正常，开始发送通知。。。'
             );
+
             for (let i = 0; i < len; i++) {
                 let folderName = filterLogDirs[i];
                 readLogFilesInDir(folderName);
@@ -159,6 +166,8 @@ function readLogFilesInDir(folderName) {
                 let singleLogPath = qlLogPath + folderName + '/' + logTime2;
                 // console.log(singleLogPath);
                 readSingleLog(singleLogPath, folderName);
+            } else {
+                console.log('跳过不发送通知！reason：上次扫描时间是：'+lastNotifyTimeStamp+' 大于最新的日志时间是'+logTime2);
             }
         } else {
             console.log(err);
@@ -190,15 +199,15 @@ async function processLineByLine(filePath) {
 
     for await (const line of rl) {
         // console.log(`Line from file: ${line}`);
+        // 等级1 过滤空行
         if (!line) {
             // console.log('空行continue');
             continue;
         }
 
-        if (mode.block && mode.block.length > 0) {
-            let blockArr = mode.block;
-
-            if (blockArr.some((x) => line.indexOf(x) > -1)) {
+        // lv2 过滤skip
+        if (mode.skip && mode.skip.length > 0) {
+            if(someOfArr(line, mode.skip)){
                 continue;
             }
         }
@@ -210,14 +219,17 @@ async function processLineByLine(filePath) {
         }
 
         if (accountSimpleCount > 0) {
-            if (line.indexOf(mode.end) > -1) {
+            //包含end标记的那行，修改为取的到
+            if(someOfArr(line, mode.end)){
                 accountSimpleCount = -1;
+                obj.notifyContent = obj.notifyContent + line + os.EOL;
                 continue;
             }
             accountSimpleCount--;
             obj.notifyContent = obj.notifyContent + line + os.EOL;
         }
 
+        // 上一段的结束 &&  新的开始
         if (accountSimpleCount == -1 && line.indexOf(mode.start) > -1) {
             // console.log('京东账号:' + line);
             obj.notifyContent = (obj.notifyContent || '') + line + os.EOL;
@@ -292,8 +304,8 @@ function paddingZero(v) {
 }
 
 // hit project list
-function hitNotifyPro(curLogFolder, projects) {
-    return projects.some((x) => curLogFolder.indexOf(x) > -1);
+function someOfArr(text, keysArr) {
+    return keysArr.some((x) => text.indexOf(x) > -1);
 }
 
 // hit whilte/black list
