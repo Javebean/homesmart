@@ -9,33 +9,47 @@ const timeout = 15000;
 
 // QingLong log path
 const qlLogPath = '../log/';
-const timeStamp = getTodayDateStr();
-let lastNotifyTimeStamp = getTodayDateStr(0, -7); //上次通知时间 now - 1hour
+const notifyTimeLogPath = __dirname + '/notifyTimeLog.json';
+
 
 //启用通知的项目
 let NOTIFY_PRO = ['6dylan6_jdpro'];
 
 let MODE = 0; // 0:WHITE 1:BLACK
 let WHITELIST = [
-    'jd_fruit#1',
     'jd_speed_sign#0',
-    'jd_dwapp#3',//积分话费
-    'jx_joypark_task#4',
-    'jd_wxttzq#3',
-    //    'jd_speed_signfree#2',
+    'jd_fruit#1',
+    'jd_fruit_new#2',
+    'jd_dwapp#4',//积分话费
+    'jd_wxttzq#4',
+    'jx_joypark_task#5',
+    'jd_wskey#6',
+    // 'jd_wsck#7', //停用
 ];
 
 // [start,end)
 let WHITELIST_MODE = [
-    { start: '正常运行中', end: [', 结束'], skip: ['任务完成','记录成功','气泡收取成功'] },
-    { start: '系统通知', end: ['【预测】','已可领取','重新登录'], skip: ['东东农场','水果名称','已兑换','剩余水滴','领取失败'] },
-    {
-        start: '开始【京东账号',
-        end: '系统通知',
-        skip: ['脚本也许随时失效,请注意', '没有需要签到的'],
-    },
-    { start: '开始【京东账号', end: [', 结束!'], skip: ['去做','领取任务','去领积分','已完成浏览','领取成功','去签到'] },
-    { start: '开始内部互助', end: ['没有可用于助力的ck'], skip: ['账号'] },
+    { start: '正常运行中', end: [', 结束'], skip: ['任务完成','记录成功','气泡收取成功'] }, //0
+    { start: '系统通知', end: ['【预测】','已可领取','重新登录','--【京东账号'], skip: ['水果名称','已兑换','剩余水滴','领取失败'] },//1
+    { start: '系统通知', end: ['【预测】','已可领取','重新登录','数据异常','剩余水','调用API失败','任务执行异常','发送通知消息成功'], skip: ['水果名称'] },//2
+    { start: '开始【京东账号', end: '系统通知', skip: ['脚本也许随时失效,请注意', '没有需要签到的'] },//3
+    { start: '开始【京东账号', end: [', 结束!'], skip: ['去做','领取任务','去领积分','已完成浏览','领取成功','去签到','开始任务','等待','任务完成','领取奖励','--已完成','at','scripts','TypeError','function'] },//4
+    { start: '开始内部互助', end: ['没有可用于助力的ck'], skip: ['账号'] },//5
+    { start: '检索成功', end: ['账号启用','账号禁用'], skip: ['检索成功','状态正常','账号有效','账号启用'] },//6
+    { start: '转换结果', end: ['执行结束'], skip: [] },//7
+];
+
+// 帐号 - 昵称
+let nickNameMap = [
+    { ID: '1178080609_m',     nick: '5210'  },
+    { ID: 'jd_JSwOngbVqJvL',  nick: '1330'  },
+    { ID: 'jd_625e3281b31ca', nick: '7467'  },
+    { ID: 'jd_4d2a4a1043fd6', nick: '2890'  },
+    { ID: 'jd_YjNlBptDjNHx',  nick: '6143'  },
+    { ID: 'jd_BCOTMkLCiRjV',  nick: '1975'  },
+    { ID: 'jd_6cc96411fe998', nick: '2626'  },
+    { ID: 'jd_UdFBUuRwgSZz',  nick: 'bro'   },
+    { ID: 'wdfsDgQuBuEEce',   nick: 'jiang' },
 ];
 
 //日志黑名单
@@ -68,42 +82,7 @@ let GLOBAL_LEVEL = GLOBAL_LEVEL_0;
 taskStart();
 
 function taskStart() {
-    fs.readFile(__dirname + '/notifyTimeLog.txt', function (err, data) {
-        let arr = []
-        if (!err) {
-            arr = data.toString().replace(/\r\n/g, '\n').split('\n');
-            console.log(arr);
-
-            //循环原因：取最后一个有效的时间
-            for (let i = arr.length - 1; i >= 0; i--) {
-                if (arr[i] && arr[i].length > 4) {
-                    lastNotifyTimeStamp = arr[i]; //倒序选择第一个时间
-                    // lastNotifyTimeStamp = '2022-11-23-15-12-46';
-                    break;
-                }
-            }
-        }
-
-        console.log('上次通知的时间戳: ' + lastNotifyTimeStamp);
-        loopLogDirs();
-
-        writeExeTime(arr.length > 50 ? 'w' : 'a');
-    });
-}
-
-function writeExeTime(f) {
-    // 将执行日期数据写入文件notifyTimeLog.txt
-    fs.writeFile(
-        __dirname + '/notifyTimeLog.txt',
-        timeStamp + os.EOL,
-        { flag: f },
-        // 写入文件后调用的回调函数
-        function (err) {
-            if (err) throw err;
-            // 如果没有错误
-            console.log('本次通知时间写入成功: ' + timeStamp);
-        }
-    );
+    loopLogDirs();
 }
 
 function loopLogDirs() {
@@ -133,12 +112,6 @@ function loopLogDirs() {
                 return;
             }
 
-
-            BarkNotify(
-                getTodayDateStr(2) + ' 服务器检测',
-                '服务器正常，开始发送通知。。。'
-            );
-
             for (let i = 0; i < len; i++) {
                 let folderName = filterLogDirs[i];
                 readLogFilesInDir(folderName);
@@ -161,13 +134,12 @@ function readLogFilesInDir(folderName) {
             if (logTime1 > logTime2) {
                 logTime2 = logTime1;
             }
-
-            if (logTime2 > lastNotifyTimeStamp) {
+            if (logTime2 > getSendTime(folderName)) {
+                console.log('PreSend', folderName, '上次发送时间：'+getSendTime(folderName)+' 本次日志时间：'+logTime2);
                 let singleLogPath = qlLogPath + folderName + '/' + logTime2;
-                // console.log(singleLogPath);
-                readSingleLog(singleLogPath, folderName);
+                readSingleLog(singleLogPath, folderName, logTime2);
             } else {
-                console.log('跳过不发送通知！reason：上次扫描时间是：'+lastNotifyTimeStamp+' 大于最新的日志时间是'+logTime2);
+                console.log('SkipSend', folderName, '上次发送时间：'+getSendTime(folderName)+' 本次日志时间：'+logTime2);
             }
         } else {
             console.log(err);
@@ -176,8 +148,7 @@ function readLogFilesInDir(folderName) {
 }
 
 // readFile line by line
-async function processLineByLine(filePath) {
-    console.log(filePath);
+async function processLineByLine(filePath, folderName, sendTime) {
     const fileStream = fs.createReadStream(filePath);
 
     const rl = readline.createInterface({
@@ -195,64 +166,110 @@ async function processLineByLine(filePath) {
         console.log('没有解析模板，直接返回', filePath);
         return;
     }
-    console.log('使用该模板：', filePath, mode);
 
-    for await (const line of rl) {
+    for await (let oriLine of rl) {
+        let line = oriLine;
         // console.log(`Line from file: ${line}`);
         // 等级1 过滤空行
-        if (!line) {
+        if (!oriLine) {
             // console.log('空行continue');
             continue;
         }
 
         // lv2 过滤skip
         if (mode.skip && mode.skip.length > 0) {
-            if(someOfArr(line, mode.skip)){
+            if(someOfArr(oriLine, mode.skip)){
                 continue;
             }
         }
 
+        if (oriLine.indexOf('*****') > -1 ) {
+            line = line.replaceAll('*','');
+        }
+        if (oriLine.indexOf('=====') > -1 ) {
+            line = line.replaceAll('=','');
+        }
+        if (oriLine.indexOf('----') > -1 ) {
+            line = line.replaceAll('-','');
+        }
+        if (oriLine.indexOf('系统通知') > -1) {
+            line = '';
+        }
+        if (oriLine.indexOf('东东农场-任务') > -1 || oriLine.indexOf('新农场任务') > -1) {
+            line = '';
+        }
+
+        if (oriLine.indexOf('转换异常') > -1 || oriLine.indexOf('转换成功') > -1) {
+            line = '';
+        }
+
+
+        //替换帐号为nick
+        line = replaceNickName(line);
+
         // console.log('^^^'+line+'^^^^');
-        if (line.indexOf(', 开始!') > -1) {
-            console.log('遍历日志开始');
-            obj.title = line;
+        if (oriLine.indexOf(', 开始!') > -1) {
+            obj.title = oriLine; //标题始终用原始值
         }
 
         if (accountSimpleCount > 0) {
             //包含end标记的那行，修改为取的到
-            if(someOfArr(line, mode.end)){
+            if(someOfArr(oriLine, mode.end)){
                 accountSimpleCount = -1;
-                obj.notifyContent = obj.notifyContent + line + os.EOL;
+                obj.notifyContent = (obj.notifyContent || '');
+                if (line) {
+                    obj.notifyContent += line + os.EOL;//这是换行，不是空一行
+                }
+                //和下一段空一行
+                if (obj.notifyContent) {
+                    obj.notifyContent += os.EOL;
+                }
+
                 continue;
             }
             accountSimpleCount--;
-            obj.notifyContent = obj.notifyContent + line + os.EOL;
+            obj.notifyContent = (obj.notifyContent || '');
+            if (line) {
+                obj.notifyContent += line + os.EOL;
+            }
         }
 
         // 上一段的结束 &&  新的开始
-        if (accountSimpleCount == -1 && line.indexOf(mode.start) > -1) {
+        if (accountSimpleCount == -1 && oriLine.indexOf(mode.start) > -1) {
             // console.log('京东账号:' + line);
-            obj.notifyContent = (obj.notifyContent || '') + line + os.EOL;
+            obj.notifyContent = (obj.notifyContent || '');
+            if (line) {
+                obj.notifyContent += line + os.EOL;
+            }
+
             accountSimpleCount = 100;
         }
 
-        if (line.indexOf('执行结束') > -1) {
-            console.log('遍历日志结束');
+        if (oriLine.indexOf('执行结束') > -1) {
+            console.log(folderName, '遍历日志结束');
             obj.endLine = line;
         }
     }
-    console.log('输出结果：', obj);
-    BarkNotify(
-        getTodayDateStr(2) + ' ' + obj.title,
-        obj.notifyContent + obj.endLine
-    );
+
+    if(obj.endLine){ // && obj.notifyContent
+        // console.log('即将发送通知：', folderName);
+        if (obj.notifyContent) {
+            console.log('SucessSend', folderName, obj);
+        } else {
+            console.log('SucessSend', folderName, '发送文件内容为空');
+        }
+        BarkNotify(getTodayDateStr(2) + ' ' + (obj.title || folderName), (obj.notifyContent || 'Empty Context') + obj.endLine);
+        setSendTime(folderName,sendTime);
+    } else {
+        console.log('FailSend', folderName, '该日志正在生成中,取消发送');
+    }
 }
 
 function whichMode(filePath) {
     for (const item of WHITELIST) {
         let name = item.split('#')[0];
         let modeIndex = item.split('#')[1];
-        console.log(name, modeIndex);
+        // console.log('PreSend', name, '使用模板', modeIndex);
         if (filePath.indexOf(name + '/') > -1) {
             return WHITELIST_MODE[modeIndex];
         }
@@ -313,9 +330,55 @@ function filterList(curLogFolder, list) {
     return list.some((x) => curLogFolder.endsWith(x.split('#')[0]));
 }
 
-function readSingleLog(filePath, descriptor) {
-    processLineByLine(filePath);
+function readSingleLog(filePath, folderName, sendTime) {
+    processLineByLine(filePath, folderName, sendTime);
 }
+
+function replaceNickName(line) {
+    let find = nickNameMap.find((x) => line.indexOf(x.ID)>-1);
+    if (find) {
+        return line.replace(find.ID, find.nick)
+    }
+    return line;
+}
+
+function getSendTime(key) {
+    try {
+        let data = fs.readFileSync(notifyTimeLogPath);
+        let logObj = JSON.parse(data);
+        return logObj[key] || '0000';
+    } catch (err) {
+        // console.log(err);
+    }
+    return '0000';
+}
+
+function setSendTime(key, value) {
+    fs.readFile(notifyTimeLogPath, function (err, data) {
+        let logObj = {};
+        if (err) {
+            if (err.code === 'ENOENT') {
+                // 如果文件不存在，则新建文件并写入内容
+                logObj[key] = value;
+                // fs.writeFile(notifyTimeLogPath, JSON.stringify(logObj), (err) => {
+                //     if (err) throw err;
+                //     console.log('File created and content written!');
+                // });
+            } else {
+                throw err;
+            }
+        } else {
+            logObj = JSON.parse(data);
+            logObj[key] = value;
+        }
+
+        fs.writeFile(notifyTimeLogPath, JSON.stringify(logObj), (err) => {
+            if (err) throw err;
+            console.log('发送日志写入成功!', key, value);
+        });
+    });
+}
+
 
 function BarkNotify(title, content) {
     if (!content) {
