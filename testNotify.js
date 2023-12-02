@@ -1,7 +1,7 @@
 ///mnt/mmcblk2p4/ql/data/scripts/
 const fs = require('fs');
 const readline = require('readline');
-let os = require('os');
+const os = require('os');
 const axios = require('axios');
 const BARK_PUSH = true;
 const BARK_CODE = "**"
@@ -10,7 +10,8 @@ const timeout = 15000;
 // QingLong log path
 const qlLogPath = '../log/';
 const notifyTimeLogPath = __dirname + '/notifyTimeLog.json';
-
+let LOGOBJ = {};
+let sendCount = 1;
 
 //启用通知的项目
 let NOTIFY_PRO = ['6dylan6_jdpro'];
@@ -24,13 +25,13 @@ let WHITELIST = [
     'jd_wxttzq#4',
     'jx_joypark_task#5',
     'jd_wskey#6',
-    // 'jd_wsck#7', //停用
+    'jd_wsck#7', //停用
 ];
 
 // [start,end)
 let WHITELIST_MODE = [
     { start: '正常运行中', end: [', 结束'], skip: ['任务完成','记录成功','气泡收取成功'] }, //0
-    { start: '系统通知', end: ['【预测】','已可领取','重新登录','--【京东账号'], skip: ['水果名称','已兑换','剩余水滴','领取失败'] },//1
+    { start: '系统通知', end: ['【预测】','已可领取','重新登录','--【京东账号','调用API失败'], skip: ['水果名称','已兑换','剩余水滴','领取失败'] },//1
     { start: '系统通知', end: ['【预测】','已可领取','重新登录','数据异常','剩余水','调用API失败','任务执行异常','发送通知消息成功'], skip: ['水果名称'] },//2
     { start: '开始【京东账号', end: '系统通知', skip: ['脚本也许随时失效,请注意', '没有需要签到的'] },//3
     { start: '开始【京东账号', end: [', 结束!'], skip: ['去做','领取任务','去领积分','已完成浏览','领取成功','去签到','开始任务','等待','任务完成','领取奖励','--已完成','at','scripts','TypeError','function'] },//4
@@ -82,7 +83,19 @@ let GLOBAL_LEVEL = GLOBAL_LEVEL_0;
 taskStart();
 
 function taskStart() {
-    loopLogDirs();
+    fs.readFile(notifyTimeLogPath, 'utf8', (err, data) => {
+        if (err) {
+            console.error('发生错误：', err);
+        } else {
+            console.log('文件内容：', data);
+            try {
+                LOGOBJ = JSON.parse(data);
+            } catch (e) {
+            }
+            console.log('格式化之后的内容：',LOGOBJ);
+            loopLogDirs();
+        }
+    });
 }
 
 function loopLogDirs() {
@@ -220,6 +233,14 @@ async function processLineByLine(filePath, folderName, sendTime) {
                 if (line) {
                     obj.notifyContent += line + os.EOL;//这是换行，不是空一行
                 }
+
+                //有可能这里就是执行结束，下面的执行执行结束就走不到了，所以这里直接判断下
+                if (oriLine.indexOf('执行结束') > -1) {
+                    console.log(folderName, '遍历日志结束');
+                    // obj.endLine = '';
+                    obj.ended = true;
+                }
+
                 //和下一段空一行
                 if (obj.notifyContent) {
                     obj.notifyContent += os.EOL;
@@ -248,18 +269,20 @@ async function processLineByLine(filePath, folderName, sendTime) {
         if (oriLine.indexOf('执行结束') > -1) {
             console.log(folderName, '遍历日志结束');
             obj.endLine = line;
+            obj.ended = true;
         }
     }
 
-    if(obj.endLine){ // && obj.notifyContent
+    if(obj.ended){ // && obj.notifyContent
         // console.log('即将发送通知：', folderName);
         if (obj.notifyContent) {
             console.log('SucessSend', folderName, obj);
         } else {
             console.log('SucessSend', folderName, '发送文件内容为空');
         }
-        BarkNotify(getTodayDateStr(2) + ' ' + (obj.title || folderName), (obj.notifyContent || 'Empty Context') + obj.endLine);
-        setSendTime(folderName,sendTime);
+        BarkNotify(getTodayDateStr(2) + ' ' + (obj.title || folderName), (obj.notifyContent || 'Empty Context') + (obj.endLine || ''));
+        let delay = (++sendCount)*1000;
+        setTimeout(setSendTime, delay, folderName, sendTime, delay);
     } else {
         console.log('FailSend', folderName, '该日志正在生成中,取消发送');
     }
@@ -343,42 +366,15 @@ function replaceNickName(line) {
 }
 
 function getSendTime(key) {
-    try {
-        let data = fs.readFileSync(notifyTimeLogPath);
-        let logObj = JSON.parse(data);
-        return logObj[key] || '0000';
-    } catch (err) {
-        // console.log(err);
-    }
-    return '0000';
+    return LOGOBJ[key] || '000000000';
 }
 
-function setSendTime(key, value) {
-    fs.readFile(notifyTimeLogPath, function (err, data) {
-        let logObj = {};
-        if (err) {
-            if (err.code === 'ENOENT') {
-                // 如果文件不存在，则新建文件并写入内容
-                logObj[key] = value;
-                // fs.writeFile(notifyTimeLogPath, JSON.stringify(logObj), (err) => {
-                //     if (err) throw err;
-                //     console.log('File created and content written!');
-                // });
-            } else {
-                throw err;
-            }
-        } else {
-            logObj = JSON.parse(data);
-            logObj[key] = value;
-        }
-
-        fs.writeFile(notifyTimeLogPath, JSON.stringify(logObj), (err) => {
-            if (err) throw err;
-            console.log('发送日志写入成功!', key, value);
-        });
-    });
+function setSendTime(key, value, flag) {
+    console.log(key, value, flag);
+    LOGOBJ[key] = value;
+    // console.log(LOGOBJ);
+    fs.writeFileSync(notifyTimeLogPath, JSON.stringify(LOGOBJ));
 }
-
 
 function BarkNotify(title, content) {
     if (!content) {
