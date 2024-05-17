@@ -4,7 +4,7 @@ const readline = require('readline');
 const os = require('os');
 const axios = require('axios');
 const BARK_PUSH = true;
-const BARK_CODE = "**"
+const BARK_CODE = 'Wqemw2bfoMB4tZYLeNL86M';
 const timeout = 15000;
 
 // QingLong log path
@@ -14,7 +14,7 @@ let LOGOBJ = {};
 let sendCount = 1;
 
 //启用通知的项目
-let NOTIFY_PRO = ['6dylan6_jdpro'];
+let NOTIFY_PRO = ['6dylan6_jdpro_jd'];
 
 let MODE = 0; // 0:WHITE 1:BLACK
 let WHITELIST = [
@@ -292,8 +292,8 @@ function whichMode(filePath) {
     for (const item of WHITELIST) {
         let name = item.split('#')[0];
         let modeIndex = item.split('#')[1];
-        // console.log('PreSend', name, '使用模板', modeIndex);
-        if (filePath.indexOf(name + '/') > -1) {
+        // console.log(filePath, name, '使用模板', modeIndex);
+        if (filePath.indexOf(name + '_') > -1) {
             return WHITELIST_MODE[modeIndex];
         }
     }
@@ -350,7 +350,7 @@ function someOfArr(text, keysArr) {
 
 // hit whilte/black list
 function filterList(curLogFolder, list) {
-    return list.some((x) => curLogFolder.endsWith(x.split('#')[0]));
+    return list.some((x) => curLogFolder.indexOf(x.split('#')[0])>-1);
 }
 
 function readSingleLog(filePath, folderName, sendTime) {

@@ -1,0 +1,52 @@
+<?xml version="1.0"?>
+<gameList>
+    <game>
+        <path>sub\subsub\新建 文本文档.txt</path>
+        <name>新建 文本文档</name>
+        <image></image>
+        <video></video>
+        <desc></desc>
+    </game>
+    <game>
+        <path>sub\新建 Microsoft Excel 工作表.xlsx</path>
+        <name>新建 Microsoft Excel 工作表</name>
+        <image></image>
+        <video></video>
+        <desc></desc>
+    </game>
+    <game>
+        <path>俄罗斯方块 2 + 炸弹版.zip</path>
+        <name>俄罗斯方块 2 + 炸弹版</name>
+        <image></image>
+        <video></video>
+        <desc></desc>
+    </game>
+    <game>
+        <path>俄罗斯方块 2.zip</path>
+        <name>俄罗斯方块 2</name>
+        <image></image>
+        <video></video>
+        <desc></desc>
+    </game>
+    <game>
+        <path>俄罗斯方块 BPF版.zip</path>
+        <name>俄罗斯方块 BPF版</name>
+        <image></image>
+        <video></video>
+        <desc></desc>
+    </game>
+    <game>
+        <path>俄罗斯方块 TENGEN版.zip</path>
+        <name>俄罗斯方块 TENGEN版</name>
+        <image></image>
+        <video></video>
+        <desc></desc>
+    </game>
+    <game>
+        <path>俄罗斯方块.zip</path>
+        <name>俄罗斯方块</name>
+        <image></image>
+        <video></video>
+        <desc></desc>
+    </game>
+</gameList>

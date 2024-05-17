@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no">
+    <title>文档标题</title>
+    <script type="text/javascript" src="/javascripts/util.js"></script>
+    <style type="text/css">
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body,
+        html {
+            width: 100%;
+            height: 100%;
+        }
+
+        #container {
+            height: 100%;
+            padding: 0 30px;
+        }
+
+        .textarea {
+            width: 100%;
+            height: 100px;
+            font-size: 16px;
+            display: block;
+            border: 1px solid #ccc;
+        }
+
+        .o-btn {
+            background-color: #4CAF50;
+            /* Green */
+            border: none;
+            color: white;
+            padding: 5px 12px;
+            text-align: center;
+            text-decoration: none;
+            border-radius: 4px;
+            font-size: 16px;
+            box-shadow: 0 8px 16px 0 rgba(0, 0, 0, 0.2), 0 6px 20px 0 rgba(0, 0, 0, 0.19);
+            float: right;
+            margin-bottom: 10px;
+            margin-left: 20px;
+        }
+
+        .prototype {
+            position: fixed;
+            z-index: 99;
+            bottom: 100px;
+            /* 与屏幕下边缘的距离 */
+            right: 20px;
+            /* 与屏幕右边缘的距离 */
+            width: 50px;
+            /* div 的宽度 */
+            height: 50px;
+            /* div 的高度 */
+            background-color: #ff6f61;
+            /* 使用醒目的现代颜色 */
+            border-radius: 50%;
+            /* 圆角 */
+            display: flex;
+            justify-content: center;
+            /* 水平居中 */
+            align-items: center;
+            /* 垂直居中 */
+            cursor: pointer;
+            /* 鼠标悬停时显示手型 */
+            box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.1);
+            /* 添加阴影效果 */
+        }
+
+        .prototype2 {
+            bottom: 30px;
+        }
+
+        .plus {
+            font-size: 30px;
+            line-height: 30px;
+            font-weight: 900;
+            /* 加号图标的大小 */
+            color: #fff;
+            /* 设置图标颜色为白色 */
+        }
+
+        .plus2 {
+            font-size: 16px;
+            color: #fff;
+        }
+
+        .file-info-container {
+            display: flex;
+            align-items: center;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            padding: 10px;
+            width: 100%;
+            margin: 25px 0;
+        }
+
+        .thumbnail {
+            width: 100px;
+            height: 100px;
+            margin-right: 20px;
+        }
+
+        .info {
+            flex-grow: 1;
+        }
+
+        .info-row {
+            margin-bottom: 5px;
+            background-color: #000;
+        }
+
+        .file-name {
+            font-weight: bold;
+        }
+
+        .buttons {
+            display: flex;
+            width: 100%;
+            justify-content: space-between;
+        }
+
+        .button {
+            padding: 8px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        .button:hover {
+            background-color: #f0f0f0;
+        }
+        .href-btn{
+            float: right;
+        }
+
+        /* HTML: <div class="loader"></div> */
+.loader {
+  height: 30px;
+  aspect-ratio: 2;
+  display: grid;
+  background:
+    radial-gradient(farthest-side,#000 15%,#0000 18%)0 0/50% 100%,
+    radial-gradient(50% 100% at 50% 160%,#fff 95%,#0000) 0 0   /50% 50%,
+    radial-gradient(50% 100% at 50% -60%,#fff 95%,#0000) 0 100%/50% 50%;
+  background-repeat: repeat-x;
+  animation: l2 1.5s infinite linear;
+}
+@keyframes l2 {
+  0%,
+  15% {background-position:0   0,0 0,0 100%}
+  20%,
+  40% {background-position:5px 0,0 0,0 100%}
+  45%,
+  55% {background-position:0   0,0 0,0 100%}
+  60%,
+  80%{background-position:-5px 0,0 0,0 100%}
+  85%,
+  100% {background-position:0   0,0 0,0 100%}
+}
+    </style>
+
+</head>
+
+<body>
+    <div onclick="handleAddClick()" class="prototype">
+        <!-- 加号图标 -->
+        <div class="plus">+</div>
+    </div>
+    <div onclick="handleUploadClick()" class="prototype prototype2">
+        <!-- 加号图标 -->
+        <div class="plus2">文件</div>
+    </div>
+    <!-- 用于选择文件的隐藏输入框 -->
+    <input type="file" name="files[]" multiple id="fileInput" style="display: none;">
+
+    <div id="container">
+        <!-- <div class="card">
+            <textarea class="textarea" rows="10" disabled></textarea>
+            <div>
+                <button class="o-btn copy-btn">复制</button>
+                <button class="o-btn edit-btn">编辑</button>
+            </div>
+        </div>
+    </div> -->
+
+        <!-- <div class="file-info-container">
+            <div class="info">
+                <div class="info-row file-name">
+                    <textarea class="textarea">zzz</textarea>
+                </div>
+                <div class="info-row">2024-05-04 10:30:00</div>
+                <div class="buttons">
+                    <button class="button">删除</button>
+                    <button class="button">编辑</button>
+                    <button class="button">复制</button>
+                </div>
+            </div>
+        </div> -->
+    </div>
+    <script type="text/javascript">
+
+        window.onload = function () {
+            doGet('/getMessageList').then(data => {
+                insertHtmlToDom(data);
+            }).catch(error => {
+                console.error('请求失败:', error); // 处理错误
+            });
+
+            // 禁止放大
+            disableTouch();
+        };
+
+
+        function insertHtmlToDom(itemArr, option = 'beforeend') {
+            var container = document.getElementById('container');
+            var itemHtml = '';
+            itemArr.forEach(function (item) {
+                if (item.file) {
+                    itemHtml += createFileHtml(item);
+                } else {
+                    itemHtml += createMessageCard(item);
+                }
+            });
+            container.insertAdjacentHTML(option, itemHtml);
+        }
+
+
+        let added = false;
+        function handleAddClick() {
+            var container = document.getElementById('container');
+            if (!added) {
+                var itemHtml = createMessageCard();
+                // container.insertBefore(card, container.firstChild);
+                container.insertAdjacentHTML('afterbegin', itemHtml); // 在容器末尾插入
+                added = true;
+            }
+            // 使用 querySelector 找到容器中的第一个 textarea 子元素
+            var firstTextarea = container.querySelector('textarea:first-of-type');
+            firstTextarea.focus();
+        }
+
+        // 在外部定义一个变量来标记是否正在上传
+        var isUploading = false;
+        function handleUploadClick() {
+            var fileInput = document.getElementById('fileInput');
+            fileInput.click();
+
+            fileInput.addEventListener('change', function () {
+                if (!isUploading) { // 检查是否正在上传
+                    isUploading = true; // 设置正在上传的标记为 true
+                    uploadFile(fileInput, '/upload');
+                }
+            });
+        }
+
+
+        // 在容器元素上添加点击事件监听器
+        container.addEventListener("click", function (event) {
+            // 复制按钮
+            if (event.target.classList.contains("copy-btn")) {
+                var card = event.target.closest(".file-info-container");
+                var textarea = card.querySelector("textarea");
+                copyTextToClipboard(textarea.value);
+            }
+
+            // 编辑保存按钮
+            if (event.target.classList.contains("edit-btn")) {
+                var card = event.target.closest(".file-info-container");
+                // 获取 card 元素下的 textarea 元素
+                var textarea = card.querySelector("textarea");
+                // 切换 textarea 的 readonly 属性
+                textarea.disabled = !textarea.disabled;
+
+                if (event.target.innerText == "保存") {
+                    event.target.innerText = "编辑"
+
+                    // 使用示例
+                    const jsonData = {
+                        message: textarea.value,
+                        id: textarea.id
+                    };
+
+                    const apiUrl = '/saveOrUpdateMessage';
+                    // 发送 JSON 数据到后台
+                    doPost(apiUrl, jsonData)
+                        .then(response => {
+                            console.log('保存成功:', response);
+                            textarea.id = response.id;
+                        })
+                        .catch(error => {
+                            console.error('请求失败:', error); // 处理错误
+                        });
+
+
+                } else if (event.target.innerText == "编辑") {
+                    var el = textarea;
+                    el.focus();
+                    if (typeof el.selectionStart == "number") {
+                        el.selectionStart = el.selectionEnd = el.value.length;
+                    } else if (typeof el.createTextRange != "undefined") {
+                        var range = el.createTextRange();
+                        range.collapse(false);
+                        range.select();
+                    }
+                    event.target.innerText = "保存"
+                }
+            }
+
+            // 下载按钮
+            if (event.target.classList.contains("download-btn")) {
+                var url = event.target.getAttribute("data-url");
+                var filename = event.target.getAttribute("data-filename");
+                handleDownloadClick(filename, url)
+            }
+
+            //删除按钮
+            if (event.target.classList.contains("delete-btn")) {
+                var id = event.target.getAttribute("data-id");
+
+                var card = event.target.closest(".file-info-container");
+                if (isEmpty(id)) {
+                    //id 也有可能在textaree中
+                    var textarea = card.querySelector("textarea");
+                    if (!isEmpty(textarea.id)) {
+                        id = textarea.id;
+                    }
+                }
+
+                if (!isEmpty(id)) {
+                    var isConfirmed = confirm("是否确认删除？");
+                    if (isConfirmed) {
+                        doPost('/deleteById', { id: id }).then(data => {
+                            card.style.display = 'none';
+                        }).catch(error => {
+                            console.error('请求失败:', error);
+                        });
+                    } else {
+                        console.log("取消删除操作");
+                    }
+                }
+            }
+        });
+
+
+        function handleDownloadClick(fileName, fileUrl) {
+            // 创建一个隐藏的链接元素
+            const link = document.createElement('a');
+            link.href = fileUrl;
+            link.download = fileName;
+
+            // 触发点击链接的事件
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        function copyTextToClipboard(text) {
+            // 创建一个临时的 textarea 元素
+            var textarea = document.createElement("textarea");
+            // 设置 textarea 的内容为要复制的文本
+            textarea.value = text;
+            // 将 textarea 添加到文档中
+            document.body.appendChild(textarea);
+            // 选中 textarea 中的文本
+            textarea.select();
+            // 执行复制命令
+            document.execCommand("copy");
+            // 移除临时创建的 textarea 元素
+            document.body.removeChild(textarea);
+        }
+
+        function uploadFile(fileInput, uploadUrl) {
+            var files = fileInput.files;
+            var formData = new FormData();
+
+            // 遍历所有选中的文件，添加到 formData 对象中
+            for (var i = 0; i < files.length; i++) {
+                formData.append('files[]', files[i]); // 注意这里的 'files[]'，表示可以传多个文件
+            }
+
+            // 发送 AJAX 请求
+            var xhr = new XMLHttpRequest();
+            xhr.open('POST', uploadUrl, true);
+            xhr.responseType = 'json'; // 设置响应类型为 JSON
+            xhr.onload = function () {
+                if (xhr.status === 200) {
+                    console.log('文件上传成功:', xhr.response);
+                    insertHtmlToDom(xhr.response, 'afterbegin');
+                } else {
+                    console.error('文件上传失败');
+                    // 处理上传失败的逻辑
+                }
+                isUploading = false; // 上传完成后重置标记为 false
+            };
+            xhr.onerror = function () {
+                console.error('请求出错');
+                isUploading = false; // 上传完成后重置标记为 false
+                // 处理请求错误的逻辑
+            };
+            xhr.send(formData); // 发送 formData，包含所有文件
+        }
+
+        function createMessageCard(item) {
+            if (!item) {
+                item = {};
+                item.message = '';
+                item.date = '';
+                item.disabled = '';
+                item.editText = '保存';
+            } else {
+                item.disabled = 'disabled';
+                item.editText = '编辑';
+            }
+
+            let messageHtml = item.message;
+            if (isValidURL(item.message)) {
+                messageHtml = "<a href='" + item.message + "'>" + item.message + "</a>";
+            }
+
+            var html = '<div class="file-info-container">'
+                + '<div class="info">'
+                + '<div class="info-row file-name">'
+                + '<textarea id=' + item.id + ' ' + item.disabled + ' class="textarea">' + messageHtml + '</textarea>'
+                + '</div>'
+                + '<div class="info-row">' + item.date + '<span><div class="loader"></div></span></div>'
+                + '<div class="buttons">'
+                + '<button class="button delete-btn" data-id="' + item.id + '">删除</button>'
+                + '<button class="button edit-btn">' + item.editText + '</button>'
+                + '<button class="button copy-btn">复制</button>'
+                + '</div>'
+                + '</div>'
+                + '</div>';
+            return html;
+        }
+
+
+        function createFileHtml(item) {
+            var html = '<div class="file-info-container">';
+            if (isImage(item.file)) {
+                html += '<img class="thumbnail" src="/upload/' + item.file + '">'
+            } else {
+                html += '<img class="thumbnail" src="/images/file.png">';
+            }
+            html += '<div class="info">'
+                + '<div class="info-row file-name">' + item.file + '</div>'
+                + '<div class="info-row">' + item.date + '</div>'
+                + '<div class="buttons">'
+                + '<button class="button delete-btn" data-id="' + item.id + '">删除</button>'
+                + '<button class="button download-btn" data-filename="' + item.file + '" data-url="/upload/' + item.file + '">下载</button>'
+                + '</div>'
+                + '</div>'
+                + '</div>';
+
+            return html;
+        }
+
+        function isImage(filename) {
+            const imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'heic', 'webp']; // 常见的图片扩展名
+            const ext = filename.slice((filename.lastIndexOf('.') - 1 >>> 0) + 2); // 获取文件的扩展名
+            return imageExtensions.includes(ext.toLowerCase()); // 判断扩展名是否在图片扩展名列表中
+        }
+
+        function isValidURL(str) {
+            // 定义一个匹配 URL 格式的正则表达式
+            const urlRegex = /^(?:(?:https?|ftp):\/\/)?(?:\S+(?::\S*)?@)?(?:(?!10(?:\.\d{1,3}){3})(?!127(?:\.\d{1,3}){3})(?!169\.254(?:\.\d{1,3}){2})(?!192\.168(?:\.\d{1,3}){2})(?!172\.(?:1[6-9]|2\d|3[0-1])(?:\.\d{1,3}){2})(?:[1-9]\d?|1\d\d|2[01]\d|22[0-3])(?:\.(?:1?\d{1,2}|2[0-4]\d|25[0-5])){2}(?:\.(?:[1-9]\d?|1\d\d|2[0-4]\d|25[0-4]))|(?:(?:[a-z\u00a1-\uffff0-9]-*)*[a-z\u00a1-\uffff0-9]+)(?:\.(?:[a-z\u00a1-\uffff0-9]-*)*[a-z\u00a1-\uffff0-9]+)*(?:\.(?:[a-z\u00a1-\uffff]{2,})))(?::\d{2,5})?(?:\/[^\\]*)?$/i;
+
+            // 使用正则表达式测试输入字符串
+            return urlRegex.test(str);
+        }
+
+
+    </script>
+</body>
+
+
+</html>
