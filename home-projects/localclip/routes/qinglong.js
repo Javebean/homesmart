@@ -5,8 +5,8 @@ const ql = require('../services/qlService');
 
 
 /* GET users listing. */
-router.use('/u', function(req, res, next) {
-  res.send('respond with a resource');
+router.use('/getEnvs', function(req, res, next) {
+ ql.getEnvs();
 });
 
 module.exports = router;

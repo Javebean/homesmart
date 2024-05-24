@@ -2,6 +2,10 @@ const fs = require('fs');
 const path = require('path')
 const multer = require('multer');
 const jsonFilePath = path.join(__dirname, '..', 'data', 'message.json');
+
+// 该路径可覆盖public下的index.html
+const indexFilePath = path.join(__dirname, '..', 'data', 'index.html');
+const indexFilePath2 = path.join(__dirname, '..', 'public', 'index.html');
 const fileUploadPath = path.join(__dirname, '..', 'data', 'upload');
 if (!fs.existsSync(fileUploadPath)) {
     fs.mkdirSync(fileUploadPath, { recursive: true });
@@ -11,7 +15,17 @@ if (!fs.existsSync(fileUploadPath)) {
 }
 
 let goHome = function (res) {
-    res.sendFile(path.join(__dirname, 'public/index.html'));
+    if (!fs.existsSync(indexFilePath)) {
+        // 复制文件到目标目录
+        fs.copyFile(indexFilePath2, indexFilePath, (err) => {
+            if (err) {
+                return console.error('文件复制失败：', err);
+            }
+            res.sendFile(indexFilePath);
+        });
+    } else {
+        res.sendFile(indexFilePath);
+    }
 }
 
 
