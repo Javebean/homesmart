@@ -5,7 +5,14 @@
     <meta charset="utf-8">
     <meta name="viewport"
         content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no">
-    <title>本地剪贴板</title>
+        <link rel="apple-touch-icon" sizes="180x180" href="/public/images/ql-icon/apple-touch-icon.png">
+        <link rel="icon" type="image/png" sizes="32x32" href="/public/images/ql-icon/favicon-32x32.png">
+        <link rel="icon" type="image/png" sizes="16x16" href="/public/images/ql-icon/favicon-16x16.png">
+        <link rel="manifest" href="/public/images/ql-icon/site.webmanifest">
+        <link rel="mask-icon" href="/public/images/ql-icon/safari-pinned-tab.svg" color="#5bbad5">
+        <meta name="msapplication-TileColor" content="#da532c">
+        <meta name="theme-color" content="#ffffff">
+        <title>青龙辅助</title>
     <script type="text/javascript" src="/public/javascripts/util.js"></script>
     <style type="text/css">
         * {
@@ -75,10 +82,6 @@
             /* 添加阴影效果 */
         }
 
-        .prototype2 {
-            bottom: 30px;
-        }
-
         .plus {
             font-size: 30px;
             line-height: 30px;
@@ -88,11 +91,6 @@
             /* 设置图标颜色为白色 */
         }
 
-        .plus2 {
-            font-size: 16px;
-            color: #fff;
-        }
-
         .file-info-container {
             display: flex;
             align-items: center;
@@ -100,7 +98,7 @@
             border-radius: 5px;
             padding: 10px;
             width: 100%;
-            margin: 25px 0;
+            margin: 20px 0;
         }
 
         .thumbnail {
@@ -113,16 +111,23 @@
             flex-grow: 1;
         }
 
-        .info-row {
-            margin-bottom: 5px;
-        }
-
         .file-name {
             font-weight: bold;
         }
 
+        .info-div {
+            margin: 10px 0;
+            display: flex;
+            flex-wrap: wrap;
+            /* 允许换行 */
+            width: 100%;
+            justify-content: space-between;
+        }
+
         .buttons {
             display: flex;
+            flex-wrap: wrap;
+            /* 允许换行 */
             width: 100%;
             justify-content: space-between;
         }
@@ -143,45 +148,29 @@
             float: right;
         }
 
-        /* HTML: <div class="loader"></div> */
-        .loader {
-            height: 16px;
-            aspect-ratio: 2;
-            display: grid;
-            background:
-                radial-gradient(farthest-side, #000 15%, #0000 18%)0 0/50% 100%,
-                radial-gradient(50% 100% at 50% 160%, #fff 95%, #0000) 0 0 /50% 50%,
-                radial-gradient(50% 100% at 50% -60%, #fff 95%, #0000) 0 100%/50% 50%;
-            background-repeat: repeat-x;
-            animation: l2 1.5s infinite linear;
+        .indicator {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 5px;
+            display: inline-block;
         }
 
-        @keyframes l2 {
+        /* 启用状态样式 */
+        .enabled {
+            background-color: #28a745;
+        }
 
-            0%,
-            15% {
-                background-position: 0 0, 0 0, 0 100%
-            }
+        /* 禁用状态样式 */
+        .disabled {
+            background-color: #dc3545;
+        }
 
-            20%,
-            40% {
-                background-position: 5px 0, 0 0, 0 100%
-            }
-
-            45%,
-            55% {
-                background-position: 0 0, 0 0, 0 100%
-            }
-
-            60%,
-            80% {
-                background-position: -5px 0, 0 0, 0 100%
-            }
-
-            85%,
-            100% {
-                background-position: 0 0, 0 0, 0 100%
-            }
+        #log-text {
+            white-space: pre-line;
+            /* 保持换行 */
+            font-family: monospace;
+            /* 使用等宽字体 */
         }
     </style>
 
@@ -192,14 +181,20 @@
         <!-- 加号图标 -->
         <div class="plus">+</div>
     </div>
-    <div onclick="handleUploadClick()" class="prototype prototype2">
-        <!-- 加号图标 -->
-        <div class="plus2">文件</div>
-    </div>
-    <!-- 用于选择文件的隐藏输入框 -->
-    <input type="file" name="files[]" multiple id="fileInput" style="display: none;">
 
     <div id="container">
+        <div class="buttons">
+            <button class="button wsck-envs-select">WSKEY</button>
+            <button class="button ck-envs-select">CK</button>
+            <button class="button all-envs-select">ALL</button>
+        </div>
+        <div class="buttons" style="margin-top: 10px;">
+            <button class="button run-cron-wsck">执行转换</button>
+            <button class="button get-cron-log">查看日志</button>
+        </div>
+        <div id="log-text"></div>
+        <div id="dy-html"></div>
+
         <!-- <div class="card">
             <textarea class="textarea" rows="10" disabled></textarea>
             <div>
@@ -211,10 +206,10 @@
 
         <!-- <div class="file-info-container">
             <div class="info">
-                <div class="info-row file-name">
+                <div class="margin-bot file-name">
                     <textarea class="textarea">zzz</textarea>
                 </div>
-                <div class="info-row">2024-05-04 10:30:00</div>
+                <div class="margin-bot">2024-05-04 10:30:00</div>
                 <div class="buttons">
                     <button class="button">删除</button>
                     <button class="button">编辑</button>
@@ -226,31 +221,32 @@
     <script type="text/javascript">
 
         window.onload = function () {
-            doGet('/getMessageList').then(data => {
-                insertHtmlToDom(data);
-            }).catch(error => {
-                console.error('请求失败:', error); // 处理错误
-            });
-
+            loadData('JD_WSCK');
             // 禁止放大
             disableTouch();
         };
 
-
-        function insertHtmlToDom(itemArr, option = 'beforeend') {
-            var container = document.getElementById('container');
-            var itemHtml = '';
-            itemArr.forEach(function (item) {
-                if (item.file) {
-                    itemHtml += createFileHtml(item);
-                } else {
-                    itemHtml += createMessageCard(item);
-                }
+        let pageIds = [];
+        function loadData(type) {
+            doPost('/ql/getTypeEnv', { type: type }).then(data => {
+                // 收集本次获取数据的ids
+                pageIds = data.map(e => e.id);
+                insertHtmlToDom(data);
+            }).catch(error => {
+                console.error('请求失败:', error); // 处理错误
             });
-            container.insertAdjacentHTML(option, itemHtml);
         }
 
+        function insertHtmlToDom(itemArr, option = 'beforeend') {
+            var container = document.getElementById('dy-html');
+            var itemHtml = '';
+            itemArr.forEach(function (item) {
+                itemHtml += createMessageCard(item);
+            });
+            container.innerHTML = itemHtml;
+        }
 
+        // 增加环境变量
         let added = false;
         function handleAddClick() {
             var container = document.getElementById('container');
@@ -265,71 +261,50 @@
             firstTextarea.focus();
         }
 
-        // 在外部定义一个变量来标记是否正在上传
-        var isUploading = false;
-        function handleUploadClick() {
-            var fileInput = document.getElementById('fileInput');
-            fileInput.click();
-
-            fileInput.addEventListener('change', function () {
-                if (!isUploading) { // 检查是否正在上传
-                    isUploading = true; // 设置正在上传的标记为 true
-                    uploadFile(fileInput, '/upload');
-                }
-            });
-        }
-
-
         // 在容器元素上添加点击事件监听器
         container.addEventListener("click", function (event) {
-            // 复制按钮
-            if (event.target.classList.contains("copy-btn")) {
-                var card = event.target.closest(".file-info-container");
-                var textarea = card.querySelector("textarea");
-                copyTextToClipboard(textarea.value);
-            }
-            //goLuck按钮
-            if (event.target.classList.contains("go-luck")) {
-                var card = event.target.closest(".file-info-container");
-                var text = card.querySelector("textarea").value;
-
-                if (isValidURL(text)) {
-                    if(text.indexOf('http')==-1){
-                        text = '//'+text;
-                    }
-                    var win = window.open(text, '_blank'); // 在新标签页中打开网址
-                    win.focus();
-                } else if (text.indexOf("wskey=") > -1) {
-                    const wsIndex = text.indexOf("wskey=");
-                    const index = text.indexOf(";", wsIndex);
-                    const result = text.substring(wsIndex, index + 1);
-                    copyTextToClipboard(result);
-                }
-            }
-
             // 编辑保存按钮
             if (event.target.classList.contains("edit-btn")) {
                 var card = event.target.closest(".file-info-container");
-                // 获取 card 元素下的 textarea 元素
                 var textarea = card.querySelector("textarea");
-                // 切换 textarea 的 readonly 属性
+                console.log(textarea.value);
+
                 textarea.disabled = !textarea.disabled;
 
                 if (event.target.innerText == "保存") {
                     event.target.innerText = "编辑"
 
-                    // 使用示例
+                    if (!textarea.value) {
+                        textarea.value = textarea.tempvalue
+                        return;
+                    }
+
                     const jsonData = {
-                        message: textarea.value,
+                        value: textarea.value,
                         id: textarea.id
                     };
 
-                    const apiUrl = '/saveOrUpdateMessage';
+                    console.log(textarea.value);
+
                     // 发送 JSON 数据到后台
-                    doPost(apiUrl, jsonData)
+                    doPost('/ql/updateEnvById', jsonData)
                         .then(response => {
                             console.log('保存成功:', response);
                             textarea.id = response.id;
+                            textarea.value = response.value;
+
+
+                            var status_text = card.querySelector(".status-text");
+                            status_text.innerText = '启用中';
+
+                            var indicator = card.querySelector(".indicator");
+                            indicator.classList.add('enabled');
+                            indicator.classList.remove('disabled');
+
+                            var enableBtn = card.querySelector(".enable-btn");
+                            enableBtn.innerText = '禁用';
+
+
                         })
                         .catch(error => {
                             console.error('请求失败:', error); // 处理错误
@@ -338,6 +313,8 @@
 
                 } else if (event.target.innerText == "编辑") {
                     var el = textarea;
+                    el.tempvalue = el.value;
+                    el.value = ''
                     el.focus();
                     if (typeof el.selectionStart == "number") {
                         el.selectionStart = el.selectionEnd = el.value.length;
@@ -350,15 +327,8 @@
                 }
             }
 
-            // 下载按钮
-            if (event.target.classList.contains("download-btn")) {
-                var url = event.target.getAttribute("data-url");
-                var filename = event.target.getAttribute("data-filename");
-                handleDownloadClick(filename, url)
-            }
-
-            //删除按钮
-            if (event.target.classList.contains("delete-btn")) {
+            // 禁用启用按钮
+            if (event.target.classList.contains("enable-btn")) {
                 var id = event.target.getAttribute("data-id");
 
                 var card = event.target.closest(".file-info-container");
@@ -371,77 +341,119 @@
                 }
 
                 if (!isEmpty(id)) {
-                    var isConfirmed = confirm("是否确认删除？");
-                    if (isConfirmed) {
-                        doPost('/deleteById', { id: id }).then(data => {
-                            card.style.display = 'none';
-                        }).catch(error => {
-                            console.error('请求失败:', error);
-                        });
-                    } else {
-                        console.log("取消删除操作");
+                    doPost('/ql/toggleStatus', { id: id }).then(data => {
+                        console.log(data.status);
+                        event.target.innerText = data.status === 0 ? '禁用' : '启用';
+
+                        var card = event.target.closest(".file-info-container");
+                        var status_text = card.querySelector(".status-text");
+                        status_text.innerText = data.status === 0 ? '启用中' : '禁用中';
+
+                        var indicator = card.querySelector(".indicator");
+                        if (data.status === 0) {
+                            indicator.classList.add('enabled');
+                            indicator.classList.remove('disabled');
+                        } else {
+                            indicator.classList.add('disabled');
+                            indicator.classList.remove('enabled');
+                        }
+
+                    }).catch(error => {
+                        console.error('请求失败:', error);
+                    });
+                }
+            }
+
+            // 禁用其他
+            if (event.target.classList.contains("disable-other-btn")) {
+                var id = event.target.getAttribute("data-id");
+
+                var card = event.target.closest(".file-info-container");
+                if (isEmpty(id)) {
+                    //id 也有可能在textaree中
+                    var textarea = card.querySelector("textarea");
+                    if (!isEmpty(textarea.id)) {
+                        id = textarea.id;
                     }
                 }
+
+                if (!isEmpty(id)) {
+                    doPost('/ql/disableOther', { id, pageIds }).then(data => {
+                        //下一个版本用vue吧，状态管理太难受
+                        const indicators = document.querySelectorAll('.indicator');
+                        indicators.forEach(indicator => {
+                            indicator.classList.remove('enabled');
+                            indicator.classList.add('disabled');
+                        });
+                        const statusTexts = document.querySelectorAll('.status-text');
+                        statusTexts.forEach(st => {
+                            st.innerText = '禁用中';
+                        });
+
+                        const enableBtns = document.querySelectorAll('.enable-btn');
+                        enableBtns.forEach(bt => {
+                            bt.innerText = '启用';
+                        });
+
+
+                        var card = event.target.closest(".file-info-container");
+                        var status_text = card.querySelector(".status-text");
+                        status_text.innerText = '启用中';
+
+                        var indicator = card.querySelector(".indicator");
+                        indicator.classList.add('enabled');
+                        indicator.classList.remove('disabled');
+
+                        var enableBtn = card.querySelector(".enable-btn");
+                        enableBtn.innerText = '禁用';
+
+                    }).catch(error => {
+                        console.error('请求失败:', error);
+                    });
+                }
+            }
+
+            if (event.target.classList.contains("ck-envs-select")) {
+                loadData('JD_COOKIE')
+            }
+            if (event.target.classList.contains("wsck-envs-select")) {
+                loadData('JD_WSCK')
+            }
+            if (event.target.classList.contains("all-envs-select")) {
+                loadData()
+            }
+            if (event.target.classList.contains("run-cron-wsck")) {
+                runCronScript('wskey本地转换', event.target);
+            }
+            if (event.target.classList.contains("get-cron-log")) {
+                getCronsLog();
             }
         });
 
 
-        function handleDownloadClick(fileName, fileUrl) {
-            // 创建一个隐藏的链接元素
-            const link = document.createElement('a');
-            link.href = fileUrl;
-            link.download = fileName;
-
-            // 触发点击链接的事件
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-        }
-
-        function copyTextToClipboard(text) {
-            // 创建一个临时的 textarea 元素
-            var textarea = document.createElement("textarea");
-            // 设置 textarea 的内容为要复制的文本
-            textarea.value = text;
-            // 将 textarea 添加到文档中
-            document.body.appendChild(textarea);
-            // 选中 textarea 中的文本
-            textarea.select();
-            // 执行复制命令
-            document.execCommand("copy");
-            // 移除临时创建的 textarea 元素
-            document.body.removeChild(textarea);
-        }
-
-        function uploadFile(fileInput, uploadUrl) {
-            var files = fileInput.files;
-            var formData = new FormData();
-
-            // 遍历所有选中的文件，添加到 formData 对象中
-            for (var i = 0; i < files.length; i++) {
-                formData.append('files[]', files[i]); // 注意这里的 'files[]'，表示可以传多个文件
-            }
-
-            // 发送 AJAX 请求
-            var xhr = new XMLHttpRequest();
-            xhr.open('POST', uploadUrl, true);
-            xhr.responseType = 'json'; // 设置响应类型为 JSON
-            xhr.onload = function () {
-                if (xhr.status === 200) {
-                    console.log('文件上传成功:', xhr.response);
-                    insertHtmlToDom(xhr.response, 'afterbegin');
-                } else {
-                    console.error('文件上传失败');
-                    // 处理上传失败的逻辑
+        function runCronScript(name, target) {
+            doPost('/ql/startRunCrons', { name }).then(data => {
+                console.log(data);
+                if (data.code == 0) {
+                    let txt = target.innerText;
+                    target.innerText = txt + " (执行成功)"
+                    setTimeout(function () {
+                        target.innerText = txt
+                    }, 1000);
                 }
-                isUploading = false; // 上传完成后重置标记为 false
-            };
-            xhr.onerror = function () {
-                console.error('请求出错');
-                isUploading = false; // 上传完成后重置标记为 false
-                // 处理请求错误的逻辑
-            };
-            xhr.send(formData); // 发送 formData，包含所有文件
+            }).catch(error => {
+                console.error('请求失败:', error);
+            });
+        }
+
+        function getCronsLog() {
+            doPost('/ql/getCronsLog', { id: 436 }).then(data => {
+                console.log(data);
+                var logText = document.getElementById('log-text');
+                logText.innerText = data.logs;
+            }).catch(error => {
+                console.error('请求失败:', error);
+            });
         }
 
         function createMessageCard(item) {
@@ -451,63 +463,56 @@
                 item.date = '';
                 item.disabled = '';
                 item.editText = '保存';
+                item.enableButText = '禁用';
             } else {
                 item.disabled = 'disabled';
                 item.editText = '编辑';
+                item.enableButText = item.status == 0 ? '禁用' : '启用';
             }
 
-            let goLuck = '';
-            if (luckDefinition(item.message)) {
-                goLuck = '<button class="button go-luck"><span><div class="go-luck loader"></div></span></button>';
-            }
+            let statusHtml = '<div class="indicator ' + (item.status == 0 ? 'enabled' : 'disabled') + '"></div> <span class="status-text">' + (item.status == 0 ? '启用中' : '禁用中') + '</span>';
 
             var html = '<div class="file-info-container">'
                 + '<div class="info">'
-                + '<div class="info-row file-name">'
-                + '<textarea id=' + item.id + ' ' + item.disabled + ' class="textarea">' + item.message + '</textarea>'
+                + '<div class="file-name">'
+                + '<textarea id=' + item.id + ' ' + item.disabled + ' class="textarea">' + item.value + '</textarea>'
                 + '</div>'
-                + '<div class="info-row">' + item.date + '</div>'
+                + '<div class="info-div">'
+                + '<div> <span>备注： </span>' + item.remarks + '</div>'
+                + '<div> <span>变量名： </span>' + item.name + '</div>'
+                + '<div> <span>状态： </span>' + statusHtml + '</div>'
+                + '<div> <span>更新日期：</span>' + formatDateString(item.timestamp) + '</div>'
+                + '</div>'
                 + '<div class="buttons">'
-                + '<button class="button delete-btn" data-id="' + item.id + '">删除</button>'
+                + '<button class="button enable-btn" data-id="' + item.id + '">' + item.enableButText + '</button>'
+                + '<button class="button disable-other-btn">禁用其他</button>'
                 + '<button class="button edit-btn">' + item.editText + '</button>'
-                + '<button class="button copy-btn">复制</button>'
-                + goLuck
                 + '</div>'
                 + '</div>'
                 + '</div>';
             return html;
         }
 
+        function formatDateString(dateString) {
+            // 将日期字符串拆分为数组
+            const dateParts = dateString.split(' ');
+            console.log(dateParts);
 
-        function createFileHtml(item) {
-            var html = '<div class="file-info-container">';
-            if (isImage(item.file)) {
-                html += '<img class="thumbnail" src="/upload/' + item.file + '">'
-            } else {
-                html += '<img class="thumbnail" src="/images/file.png">';
-            }
-            html += '<div class="info">'
-                + '<div class="info-row file-name">' + item.file + '</div>'
-                + '<div class="info-row">' + item.date + '</div>'
-                + '<div class="buttons">'
-                + '<button class="button delete-btn" data-id="' + item.id + '">删除</button>'
-                + '<button class="button download-btn" data-filename="' + item.file + '" data-url="/upload/' + item.file + '">下载</button>'
-                + '</div>'
-                + '</div>'
-                + '</div>';
+            // 月份映射
+            const monthMap = {
+                Jan: '01', Feb: '02', Mar: '03', Apr: '04', May: '05', Jun: '06',
+                Jul: '07', Aug: '08', Sep: '09', Oct: '10', Nov: '11', Dec: '12'
+            };
 
-            return html;
-        }
+            // 提取年、月、日和时间部分
+            const day = dateParts[2];
+            const month = monthMap[dateParts[1]];
+            const year = dateParts[3];
+            const time = dateParts[4];
 
-        function isImage(filename) {
-            const imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'heic', 'webp']; // 常见的图片扩展名
-            const ext = filename.slice((filename.lastIndexOf('.') - 1 >>> 0) + 2); // 获取文件的扩展名
-            return imageExtensions.includes(ext.toLowerCase()); // 判断扩展名是否在图片扩展名列表中
-        }
-
-
-        function luckDefinition(message) {
-            return isValidURL(message) || isJDWSKEY(message);
+            // 格式化日期为 YYYY-MM-DD HH:mm:ss
+            const formattedDate = `${year}-${month}-${day} ${time}`;
+            return formattedDate;
         }
 
         function isValidURL(str) {
@@ -516,10 +521,6 @@
 
             // 使用正则表达式测试输入字符串
             return urlRegex.test(str);
-        }
-
-        function isJDWSKEY(message) {
-            return message && message.indexOf('wskey') > -1
         }
 
     </script>
