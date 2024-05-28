@@ -5,7 +5,7 @@ const fs = require('fs');
 
 // 该路径可覆盖public下的index.html
 const indexSource = path.join(__dirname, '..', 'public', 'qlhelp.html');
-const indexDest= path.join(__dirname, '..', 'data', 'qlhelp.html');
+const indexDest = path.join(__dirname, '..', 'data', 'qlhelp.html');
 let goQlIndex = function (res) {
     if (!fs.existsSync(indexDest)) {
         // indexpath
@@ -133,7 +133,7 @@ class QL {
             const response = await axios.put(url, env, { headers });
             const { data } = response;
             if (data.code === 200) {
-                this.log(`启用环境变量成功`);
+                this.log(`启用环境变量成功 ${env}`);
                 return true;
             } else {
                 this.log(`启用环境变量失败：${data.message}`);
@@ -154,7 +154,7 @@ class QL {
             const response = await axios.put(url, env, { headers });
             const { data } = response;
             if (data.code === 200) {
-                this.log(`禁用环境变量成功`);
+                this.log(`禁用环境变量成功 ${env}`);
                 return true;
             } else {
                 this.log(`禁用环境变量失败：${data.message}`);
@@ -236,7 +236,8 @@ module.exports = {
     disableOther,
     startRunCrons,
     getCronsLog,
-    goQlIndex
+    goQlIndex,
+    specifiedWskeyToCk
 };
 
 async function updateEnvById(req, res, next) {
@@ -326,6 +327,43 @@ async function disableOther(req, res, next) {
     if (status_res) {
         res.json({ id: id, status: 0 });
     }
+}
+
+async function specifiedWskeyToCk(id, pageIds) {
+    if (!id || !pageIds) {
+        res.status(400).send("Bad Request");
+    }
+
+    const envs = await ql.getEnvs();
+    const enableEnvs = envs.filter(e => e.status == 0 && pageIds.includes(e.id));
+    const enableIds = enableEnvs.map(e => e.id);
+
+
+    let result = false;
+    result = await ql.disableEnvStatus(enableIds);
+    result = await ql.enableEnvStatus([id]);
+
+    let wskeyScriptId = 436;
+    // let wskeyScriptId = 355;
+    result = await ql.runCrons([wskeyScriptId]);
+
+    for (var i = 0; i < 10; i++) {
+        const logText = await ql.getCronLog(wskeyScriptId);
+        if (logText.indexOf('执行结束') == -1) {
+            console.log('尝试 ' + i + " 次");
+            await waitTime(1000);
+        } else {
+            result = await ql.enableEnvStatus(enableIds);
+            break;
+        }
+    }
+    return result;
+}
+
+const waitTime = (WAIT_TIME) => {
+    return new Promise(resolve => {
+        setTimeout(resolve, WAIT_TIME)
+    });
 }
 
 async function getTypeEnv(req, res, next) {

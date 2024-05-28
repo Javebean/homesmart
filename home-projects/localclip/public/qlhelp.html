@@ -5,14 +5,14 @@
     <meta charset="utf-8">
     <meta name="viewport"
         content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no">
-        <link rel="apple-touch-icon" sizes="180x180" href="/public/images/ql-icon/apple-touch-icon.png">
-        <link rel="icon" type="image/png" sizes="32x32" href="/public/images/ql-icon/favicon-32x32.png">
-        <link rel="icon" type="image/png" sizes="16x16" href="/public/images/ql-icon/favicon-16x16.png">
-        <link rel="manifest" href="/public/images/ql-icon/site.webmanifest">
-        <link rel="mask-icon" href="/public/images/ql-icon/safari-pinned-tab.svg" color="#5bbad5">
-        <meta name="msapplication-TileColor" content="#da532c">
-        <meta name="theme-color" content="#ffffff">
-        <title>青龙辅助</title>
+    <link rel="apple-touch-icon" sizes="180x180" href="/public/images/ql-icon/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/public/images/ql-icon/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/public/images/ql-icon/favicon-16x16.png">
+    <link rel="manifest" href="/public/images/ql-icon/site.webmanifest">
+    <link rel="mask-icon" href="/public/images/ql-icon/safari-pinned-tab.svg" color="#5bbad5">
+    <meta name="msapplication-TileColor" content="#da532c">
+    <meta name="theme-color" content="#ffffff">
+    <title>青龙辅助</title>
     <script type="text/javascript" src="/public/javascripts/util.js"></script>
     <style type="text/css">
         * {
@@ -261,6 +261,7 @@
             firstTextarea.focus();
         }
 
+        let clickOnlyToCK = false;
         // 在容器元素上添加点击事件监听器
         container.addEventListener("click", function (event) {
             // 编辑保存按钮
@@ -364,8 +365,14 @@
                 }
             }
 
-            // 禁用其他
+       
+            // 单独转换
             if (event.target.classList.contains("disable-other-btn")) {
+                if (clickOnlyToCK) {
+                    console.log('不可以多次点击');
+                    return;
+                }
+                clickOnlyToCK = true;
                 var id = event.target.getAttribute("data-id");
 
                 var card = event.target.closest(".file-info-container");
@@ -376,36 +383,25 @@
                         id = textarea.id;
                     }
                 }
-
+                let txt = event.target.innerText;
+                event.target.innerText = txt + " (执行中)"
                 if (!isEmpty(id)) {
-                    doPost('/ql/disableOther', { id, pageIds }).then(data => {
-                        //下一个版本用vue吧，状态管理太难受
-                        const indicators = document.querySelectorAll('.indicator');
-                        indicators.forEach(indicator => {
-                            indicator.classList.remove('enabled');
-                            indicator.classList.add('disabled');
-                        });
-                        const statusTexts = document.querySelectorAll('.status-text');
-                        statusTexts.forEach(st => {
-                            st.innerText = '禁用中';
-                        });
-
-                        const enableBtns = document.querySelectorAll('.enable-btn');
-                        enableBtns.forEach(bt => {
-                            bt.innerText = '启用';
-                        });
-
+                    doPost('/ql/specifiedWskeyToCk', { id, pageIds }).then(data => {
+                        clickOnlyToCK = false;
+                        event.target.innerText = txt + " (执行成功)"
+                        setTimeout(function () {
+                            event.target.innerText = txt
+                        }, 1000);
 
                         var card = event.target.closest(".file-info-container");
+                        card.querySelector(".enable-btn").innerHTML = '禁用';
+
                         var status_text = card.querySelector(".status-text");
                         status_text.innerText = '启用中';
 
                         var indicator = card.querySelector(".indicator");
                         indicator.classList.add('enabled');
                         indicator.classList.remove('disabled');
-
-                        var enableBtn = card.querySelector(".enable-btn");
-                        enableBtn.innerText = '禁用';
 
                     }).catch(error => {
                         console.error('请求失败:', error);
@@ -485,7 +481,7 @@
                 + '</div>'
                 + '<div class="buttons">'
                 + '<button class="button enable-btn" data-id="' + item.id + '">' + item.enableButText + '</button>'
-                + '<button class="button disable-other-btn">禁用其他</button>'
+                + '<button class="button disable-other-btn">单独转换</button>'
                 + '<button class="button edit-btn">' + item.editText + '</button>'
                 + '</div>'
                 + '</div>'
@@ -496,8 +492,6 @@
         function formatDateString(dateString) {
             // 将日期字符串拆分为数组
             const dateParts = dateString.split(' ');
-            console.log(dateParts);
-
             // 月份映射
             const monthMap = {
                 Jan: '01', Feb: '02', Mar: '03', Apr: '04', May: '05', Jun: '06',
