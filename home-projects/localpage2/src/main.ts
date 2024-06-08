@@ -8,4 +8,4 @@ const app = createApp(App);
 // import Antd from 'ant-design-vue';
 // app.use(Antd);
 app.config.globalProperties.$api = api;
-app.use(store).use(router).mount('#app')
+app.use(store).use(router).mount('#app');

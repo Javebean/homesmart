@@ -19,7 +19,7 @@
       <a-tab-pane key="ALL">
         <template #tab>
           <span>
-            ALL
+            其他
           </span>
         </template>
       </a-tab-pane>
@@ -28,7 +28,7 @@
     <a-flex :justify="justify" :align="alignItems" wrap="wrap">
       <a-button @click="disableAllByType">禁用本页</a-button>
       <a-button @click="enableAllByType">启用本页</a-button>
-      <a-button @click="selectLatestWsckLog">查看wskey日志</a-button>
+      <a-button @click="selectLatestWsckLog">查看最新wskey日志</a-button>
     </a-flex>
 
     <div class="ws-log">
@@ -37,32 +37,39 @@
 
     <div class="data-item" v-for="env in items" :key="env.id">
       <a-card :bodyStyle="{ padding: '10px' }" style="width: 100%">
-      <a-textarea :disabled="env.disabled" v-model:value="env.value" placeholder="请输入新值" :autosize="true" />
+        <a-textarea :disabled="env.disabled" v-model:value="env.value" placeholder="请输入"
+          :autoSize="env.value ? true : { minRows: 6, maxRows: 8 }" />
 
-      <a-flex class="status-info" :justify="justify" :align="alignItems" wrap="wrap">
-        <div>备注： {{ env.remarks }}</div>
-        <div>变量名：{{ env.name }}</div>
-        <div>状态：<a-badge :color="env.status === 0 ? 'green' : 'red'" />{{ env.status === 0 ? "启用中" : "禁用中" }}</div>
-        <div>更新日期：{{ formatDateString(env.timestamp) }}</div>
-      </a-flex>
-      <a-flex :justify="justify" :align="alignItems">
-        <a-button type="primary" @click="toggleQlEnvStatus(env.id)">{{ env.status === 0 ? "禁用" : "启用" }}</a-button>
-        <a-button type="primary" v-show="env.name == 'JD_COOKIE'" @click="disableOtherCk(env.id)">禁用其他CK</a-button>
-        <a-button type="primary" v-show="env.disabled" @click="updateQlEnv(env.id)">编辑</a-button>
-        <a-button type="primary" :loading="env.loading" v-show="!env.disabled" @click="saveQlEnv(env.id)">保存</a-button>
-      </a-flex>
-    </a-card>
+        <a-flex class="status-info" :justify="justify" :align="alignItems" wrap="wrap">
+          <div>备注： {{ env.remarks }}</div>
+          <div>变量名：{{ env.name }}</div>
+          <div>状态：<a-badge :color="env.status === 0 ? 'green' : 'red'" />{{ env.status === 0 ? "启用中" : "禁用中" }}</div>
+          <div>更新日期：{{ formatDateString(env.timestamp) }}</div>
+        </a-flex>
+        <a-flex :justify="justify" :align="alignItems">
+          <a-button type="primary" @click="toggleQlEnvStatus(env.id)">{{ env.status === 0 ? "禁用" : "启用" }}</a-button>
+          <a-button type="primary" v-show="env.name == 'JD_COOKIE'" @click="disableOtherCk(env.id)">禁用其他CK</a-button>
+          <a-button type="primary" v-show="env.disabled" @click="updateQlEnv(env.id)">编辑</a-button>
+          <a-button type="primary" :loading="env.loading" v-show="!env.disabled"
+            @click="saveQlEnv(env.id)">保存</a-button>
+        </a-flex>
+      </a-card>
     </div>
-
+    <context-holder />
   </div>
 </template>
 
 <script lang="ts" setup>
 import { ref, getCurrentInstance, onMounted } from 'vue';
 // import { MailOutlined, AppstoreOutlined, SettingOutlined } from '@ant-design/icons-vue';
-import { message, Flex as AFlex, Textarea as ATextarea, Button as AButton, TabPane as ATabPane, Tabs as ATabs, Badge as ABadge,Card as ACard } from 'ant-design-vue';
+import { message, Flex as AFlex, Textarea as ATextarea, Button as AButton, TabPane as ATabPane, Tabs as ATabs, Badge as ABadge, Card as ACard } from 'ant-design-vue';
+// import { message, Flex as AFlex} from 'ant-design-vue';
 //F1 -> reload window helped me
 // import { MenuProps } from 'ant-design-vue';
+
+// 新版message 需要在组件中引用<context-holder />才能生效
+// https://juejin.cn/post/7358639538501419059
+const [messageApi, contextHolder] = message.useMessage();
 
 // ts proxy 使用
 const { proxy }: any = getCurrentInstance()
@@ -119,19 +126,42 @@ function saveQlEnv(id: number) {
   const itemToUpdate = items.value.find(item => item.id === id);
   if (!itemToUpdate.value) {
     itemToUpdate.value = itemToUpdate.value0;
-    message.info('无更新');
+    // message.info('无更新');
+    messageApi.info({
+      content: () => '无更新',
+      class: 'custom-class',
+      style: {
+        marginTop: '5vh',
+      },
+    });
+
     itemToUpdate.disabled = true;
   } else {
     itemToUpdate.loading = true
     proxy.$api.QL.updateEnvById({ id: id, value: itemToUpdate.value }).then((response: any) => {
       const data = response.data
       itemToUpdate.value = data.value;
+      itemToUpdate.status = data.status;
       console.log(data);
+      messageApi.success({
+        content: () => data.msg,
+        class: 'custom-class',
+        style: {
+          marginTop: '5vh',
+        },
+      });
+    }).catch(function (error: any) {
+      console.log(error.response.data);
+      messageApi.error({
+        content: () => error.response.data.msg,
+        class: 'custom-class',
+        style: {
+          marginTop: '5vh',
+        },
+      });
+    }).finally(() => {
       itemToUpdate.loading = false;
       itemToUpdate.disabled = true;
-      message.success('更新成功');
-    }).catch(function (error: any) {
-      console.log(error);
     });
   }
 }
@@ -147,7 +177,14 @@ function disableOtherCk(id: number) {
         item.status = 1;
       }
     });
-    message.success('禁用成功');
+    // message.success('禁用成功');
+    messageApi.success({
+      content: () => '禁用成功',
+      class: 'custom-class',
+      style: {
+        marginTop: '5vh',
+      },
+    });
   }).catch(function (error: any) {
     console.log(error);
   });
@@ -226,7 +263,7 @@ function formatDateString(dateString: string) {
   text-align: left;
 }
 
-.data-item{
+.data-item {
   margin: 0.8rem 0;
 }
 
@@ -234,5 +271,4 @@ function formatDateString(dateString: string) {
   font-size: 1rem;
   margin: 0.5rem 0;
 }
-
 </style>

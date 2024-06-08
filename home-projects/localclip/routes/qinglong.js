@@ -46,7 +46,7 @@ router.use('/toggleStatus', async (req, res) => {
 
 router.use('/updateEnvById', async (req, res) => {
     try {
-        return await ql.updateEnvById(req, res);
+        await ql.updateEnvById(req, res);
     } catch (error) {
         console.log(error);
         res.status(500).send('Failed to get environment variables');

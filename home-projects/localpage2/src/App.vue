@@ -3,8 +3,16 @@
     <router-link to="/env">Home</router-link> |
     <router-link to="/about">About</router-link>
   </nav>
-  <router-view/>
+  <StyleProvider hash-priority="high" :transformers="[legacyLogicalPropertiesTransformer]">
+    <router-view />
+  </StyleProvider>
 </template>
+
+
+<script lang="ts" setup>
+import { StyleProvider } from 'ant-design-vue';
+import { legacyLogicalPropertiesTransformer } from 'ant-design-vue';
+</script>
 
 <style>
 #app {

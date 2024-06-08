@@ -250,37 +250,36 @@ module.exports = {
 async function updateEnvById(req, res, next) {
     let id = req.body.id;
     let value = req.body.value;
-    if (!id) {
-        res.status(400).send("Bad Request");
+    if (!id || !value) {
+        res.status(400).send({ msg: "Bad Request", code: 1 });
+        return;
     }
 
     let envs = await ql.getEnvs();
     const finded = envs.find(e => e.id == id);
 
-    let toCkRes = {};
-    // 如果是wskey，只更新wskey的部分
-    if (value.indexOf('wskey=') > -1) {
+    if (!finded) {
+        res.status(500).send({ msg: '没找到id=' + id + " 的环境变量", code: 1 });
+        return;
+    }
 
-        const wsIndex = value.indexOf("wskey=");
-        const index = value.indexOf(";", wsIndex);
-        const result = value.substring(wsIndex, index + 1);
-
-        // pin值使用原值，如果原值不存在使用参数中的pin值
-        let value0 = finded.value;
-        let pinIndex = value0.indexOf("pin=");
-        if (pinIndex == -1) {
-            value0 = value;
-            pinIndex = value0.indexOf("pin=");
-            if (pinIndex == -1) {
-                res.status(400).send('传参无pin值');
-            }
+    // 如果value含有wskey，顺便转换下wskey->ck
+    if (value.indexOf('wskey=') > -1 && finded.name == 'JD_WSCK') {
+        // 提取value中新的wskey
+        const newWskey = getPinKeyFromEnv('wskey', value);
+        console.log('新的wskey' + newWskey);
+        // 如果传参中有pin值，和原值对比
+        const newPin = getPinKeyFromEnv('pin', value);
+        const oldPin = getPinKeyFromEnv('pin', finded.value)
+        if (newPin && oldPin && newPin != oldPin) {
+            res.status(500).send({ msg: "新pin值和旧pin值不相同，请检查！", code: 1 });
+            return;
         }
-        const pinEndIndex = value0.indexOf(";", pinIndex);
-        const pin = value0.substring(pinIndex, pinEndIndex + 1);
-        value = pin + result
-
-        const enableIds = envs.filter(e => e.name == 'JD_WSCK' && e.status == 0).map(e => e.id);
-        toCkRes = await wskeyToCk(id, enableIds);
+        if (!newPin && !oldPin) {
+            res.status(500).send({ msg: "pin值不存在，请检查！", code: 1 });
+            return;
+        }
+        value = (oldPin || newPin) + newWskey;
     }
 
     const update_item = {
@@ -290,15 +289,26 @@ async function updateEnvById(req, res, next) {
         remarks: finded.remarks
     }
     if (await ql.updateEnv(update_item)) {
-        //更新成功把状态改成启用’
-        let status_res = await ql.enableEnvStatus([Number(id)]);
-        if (!status_res) {
-            console.log('更新后，状态改变失败');
+        //更新成功把状态改成启用
+        let update = await ql.enableEnvStatus([Number(id)]);
+        if (value.indexOf('wskey') == -1) {
+            if (update) {
+                res.status(200).send({ msg: '更新并启用成功', value, status: 0, code: 0 });
+            } else {
+                res.status(500).send({ msg: '更新成功，启用失败', code: 1 });
+            }
+            return;
+        } else {
+            let wsUpdate = await oneWskeyToCk(id, envs);
+            if (wsUpdate) {
+                res.status(200).send({ msg: 'wskey更新成功，ck转换成功！', status: 0, value, code: 0 });
+            } else {
+                res.status(500).send({ msg: 'wskey更新成功，ck转换失败！', code: 1 });
+            }
+            return;
         }
-        res.json({ id: id, value: value, updateMsg: status_res ? "更新成功" : "更新失败", wskeyMsg: toCkRes.message });
-    } else {
-        res.status(500).send('更新环境变量失败');
     }
+    res.status(500).send({ msg: '更新环境变量失败', code: 1 });
 }
 
 async function toggleStatus(req, res, next) {
@@ -389,59 +399,95 @@ async function specifiedWskeyToCk(id, pageIds) {
     }
 
     const envs = await ql.getEnvs();
-    const enableIds = envs.filter(e => e.status == 0 && pageIds.includes(e.id)).map(e => e.id);
-
-    return wskeyToCk(id, enableIds);
+    return oneWskeyToCk(id, envs);
 }
 
+// 转换一个wskey ->ck
+async function oneWskeyToCk(id, envs) {
+    // 用来在最后还原原来状态
+    const enableWsIds = envs.filter(e => e.status == 0 && e.name == 'JD_WSCK').map(e => e.id);
+    const wskeyIds = envs.filter(e => e.name == 'JD_WSCK').map(e => e.id);
+    if (wskeyIds.length == 0) {
+        console.log("没有wskey的环境变量");
+        return false;
+    }
+    // 先禁用所有的 wskey，不管禁用还是启用状态。
+    await ql.disableEnvStatus(wskeyIds);
+    // 单独启用 目标 wskey
+    if (wskeyIds.includes(id)) {
+        await ql.enableEnvStatus([id]);
+    } else {
+        console.log("id 不是wskey: " + id);
+        console.log("全部wskey id : " + wskeyIds);
+        return false;
+    }
 
-async function wskeyToCk(id, enableIds) {
-    // 先禁用 enable
-    result = await ql.disableEnvStatus(enableIds);
+    // 运行转换任务 - wskey本地转换
+    let wskeyScriptId = 436;
+    // let wskeyScriptId = 355; //测试任务id 茅台签到
+    await ql.runCrons([wskeyScriptId]);
 
-    // 启用单独
-    result = await ql.enableEnvStatus([id]);
-
-    // let wskeyScriptId = 436;
-    let wskeyScriptId = 355; //测试任务id 茅台签到
-    result = await ql.runCrons([wskeyScriptId]);
-
-    let message = "";
+    let result = false;
     for (var i = 0; i < 30; i++) {
+        await waitTime(100);
         const logText = await ql.getCronLog(wskeyScriptId);
         console.log("wskeyToCk log: " + logText);
-
-        if (logText.indexOf('执行结束') > 0 || logText.indexOf('秒后重试') > 0) {
-            if (logText.indexOf('执行结束') > 0) {
-                message = "执行成功"
-            } else {
-                message = "等待重试"
-            }
+        if (logText.indexOf('转换成功') > 0) {
+            result = true;
+            break;
+        } else if (logText.indexOf('转换失败') > 0) {
+            result = false;
             break;
         } else {
             console.log('尝试 ' + i + " 次");
             await waitTime(1000);
         }
     }
-    //还原
-    result = await ql.enableEnvStatus(enableIds);
-    return { result, message: message || "wskey更新超时返回" }
+    // 不管成功还是失败都还原
+    await ql.enableEnvStatus(enableWsIds);
+    return result;
 }
 
 
 
-
+/**----------工具方法----------- */
 const waitTime = (WAIT_TIME) => {
     return new Promise(resolve => {
         setTimeout(resolve, WAIT_TIME)
     });
 }
 
+function getPinKeyFromEnv(key, text) {
+    if (!key || !text) {
+        return;
+    }
+
+    let k = '';
+    if (key == 'pin') {
+        k = 'pin=';
+    } else if (key = 'wskey') {
+        k = 'wskey='
+    } else {
+        return null;
+    }
+
+    const start = text.indexOf(k);
+    if (start > -1) {
+        const end = text.indexOf(";", start);
+        return text.substring(start, end + 1);
+    }
+    return null;
+}
+
+
+
 async function getTypeEnv(req, res, next) {
     let type = req.body.type;
     let envs = await ql.getEnvs();
     if (type && type.toLowerCase() !== 'all') {
         envs = envs.filter(e => type == e.name);
+    } else {
+        envs = envs.filter(e => e.name != 'JD_WSCK' && e.name != 'JD_COOKIE');
     }
     console.log(envs.length);
 
@@ -499,7 +545,7 @@ async function getCronsLogById(id, res, next) {
 
 async function getLatestWsckLog(req, res, next) {
     let crons = await ql.getCrons();
-    const findItem = crons.find(e => e.name == 'wskey转换');
+    const findItem = crons.find(e => e.name == 'wskey本地转换');
     if (findItem) {
         getCronsLogById(findItem.id, res);
     } else {

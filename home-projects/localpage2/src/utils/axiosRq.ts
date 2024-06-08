@@ -1,10 +1,17 @@
 import axios from "axios";
 import router from "../router";
 
+let baseURL = '/';
+if (process.env.NODE_ENV != "production") {
+    baseURL = 'http://192.168.1.5:3000/';
+    console.log('开发ip:' + baseURL);
+}
 const request = axios.create({
-    // baseURL:'http://192.168.1.5:3000/',
-    baseURL:'/',
+    baseURL: baseURL,
 })
+console.log('环境：' + process.env.NODE_ENV);
+
+
 request.defaults.headers.post['Content-Type'] = 'application/json';
 
 
