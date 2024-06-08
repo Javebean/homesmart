@@ -4,3 +4,4 @@ npm-debug.log
 .git
 testdockerignore
 data/upload
+public/vue/js/*.js.map

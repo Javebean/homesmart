@@ -5,14 +5,14 @@ const { QL } = require('../services/qlService');
 const ql = require('../services/qlService');
 
 //ql
-router.get('/', (req, res) => {
-    try {
-        ql.goQlIndex(res);
-    } catch (error) {
-        console.log(error);
-        res.status(500).send('Failed to get environment variables');
-    }
-});
+// router.get('/public/vue', (req, res) => {
+//     try {
+//         ql.goQlIndex(res);
+//     } catch (error) {
+//         console.log(error);
+//         res.status(500).send('Failed to get environment variables');
+//     }
+// });
 
 
 router.use('/getEnvs', async (req, res) => {
@@ -53,9 +53,27 @@ router.use('/updateEnvById', async (req, res) => {
     }
 });
 
-router.use('/disableOther', async (req, res) => {
+router.use('/disableOtherCk', async (req, res) => {
     try {
-        return await ql.disableOther(req, res);
+        return await ql.disableOtherCk(req, res);
+    } catch (error) {
+        console.log(error);
+        res.status(500).send('Failed to get environment variables');
+    }
+});
+
+router.use('/disableEnvByName', async (req, res) => {
+    try {
+        return await ql.disableEnvByName(req, res);
+    } catch (error) {
+        console.log(error);
+        res.status(500).send('Failed to get environment variables');
+    }
+});
+
+router.use('/enableEnvByName', async (req, res) => {
+    try {
+        return await ql.enableEnvByName(req, res);
     } catch (error) {
         console.log(error);
         res.status(500).send('Failed to get environment variables');
@@ -66,9 +84,11 @@ router.use('/specifiedWskeyToCk', async (req, res) => {
     try {
         let id = req.body.id;
         let pageIds = req.body.pageIds;
-        if( await ql.specifiedWskeyToCk(id, pageIds)){
-            res.json({ id: id, status: 0 });
-        }else{
+
+        let obj = await ql.specifiedWskeyToCk(id, pageIds);
+        if (obj.result) {
+            res.json({ id: id, ...obj });
+        } else {
             res.status(500).send('Failed to get environment variables1');
         }
     } catch (error) {
@@ -88,7 +108,17 @@ router.use('/startRunCrons', async (req, res) => {
 
 router.use('/getCronsLog', async (req, res) => {
     try {
-        return await ql.getCronsLog(req, res);
+        let id = req.body.id;
+        return await ql.getCronsLogById(id, res);
+    } catch (error) {
+        console.log(error);
+        res.status(500).send('Failed to get environment variables');
+    }
+});
+
+router.use('/getLatestWsckLog', async (req, res) => {
+    try {
+        return await ql.getLatestWsckLog(req, res);
     } catch (error) {
         console.log(error);
         res.status(500).send('Failed to get environment variables');

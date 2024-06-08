@@ -28,8 +28,8 @@
         }
 
         #container {
-            height: 100%;
             padding: 0 30px;
+            margin-bottom: 20px;
         }
 
         .textarea {
@@ -218,6 +218,7 @@
             </div>
         </div> -->
     </div>
+    <div style="margin-left: 30px;">v2.1</div>
     <script type="text/javascript">
 
         window.onload = function () {
@@ -266,9 +267,10 @@
         container.addEventListener("click", function (event) {
             // 编辑保存按钮
             if (event.target.classList.contains("edit-btn")) {
+
+
                 var card = event.target.closest(".file-info-container");
                 var textarea = card.querySelector("textarea");
-                console.log(textarea.value);
 
                 textarea.disabled = !textarea.disabled;
 
@@ -276,7 +278,14 @@
                     event.target.innerText = "编辑"
 
                     if (!textarea.value) {
-                        textarea.value = textarea.tempvalue
+                        textarea.value = textarea.tempvalue;
+                        clickOnlyToCK = false;
+                        return;
+                    }
+
+
+                    if (!clickOnlyToCK) {
+                        console.log('不可以多次点击');
                         return;
                     }
 
@@ -287,9 +296,26 @@
 
                     console.log(textarea.value);
 
+                    var infoDiv = event.target.closest(".info");
+                    infoDiv.insertAdjacentHTML('beforeend', '<div>(正在执行中，请稍等。。。)</div>');
                     // 发送 JSON 数据到后台
                     doPost('/ql/updateEnvById', jsonData)
                         .then(response => {
+
+                            clickOnlyToCK = true;
+
+                            infoDiv.removeChild(infoDiv.lastElementChild);
+                            if (textarea.value.indexOf('wskey') > -1) {
+                                infoDiv.insertAdjacentHTML('beforeend', '<div>' + response.wskeyMsg + '</div>');
+                            } else {
+                                infoDiv.insertAdjacentHTML('beforeend', '<div>' + response.updateMsg + '</div>');
+                            }
+
+                            setTimeout(function () {
+                                infoDiv.removeChild(infoDiv.lastElementChild);
+                            }, 3000);
+
+
                             console.log('保存成功:', response);
                             textarea.id = response.id;
                             textarea.value = response.value;
@@ -305,7 +331,6 @@
                             var enableBtn = card.querySelector(".enable-btn");
                             enableBtn.innerText = '禁用';
 
-
                         })
                         .catch(error => {
                             console.error('请求失败:', error); // 处理错误
@@ -313,6 +338,13 @@
 
 
                 } else if (event.target.innerText == "编辑") {
+
+                    if (clickOnlyToCK) {
+                        console.log('不可以多次点击');
+                        return;
+                    }
+                    clickOnlyToCK = true;
+
                     var el = textarea;
                     el.tempvalue = el.value;
                     el.value = ''
@@ -365,9 +397,9 @@
                 }
             }
 
-       
+
             // 单独转换
-            if (event.target.classList.contains("disable-other-btn")) {
+            if (event.target.classList.contains("wskey-ck-btn")) {
                 if (clickOnlyToCK) {
                     console.log('不可以多次点击');
                     return;
@@ -408,6 +440,55 @@
                     });
                 }
             }
+
+            if (event.target.classList.contains("disable-other-btn")) {
+                var id = event.target.getAttribute("data-id");
+
+                var card = event.target.closest(".file-info-container");
+                if (isEmpty(id)) {
+                    //id 也有可能在textaree中
+                    var textarea = card.querySelector("textarea");
+                    if (!isEmpty(textarea.id)) {
+                        id = textarea.id;
+                    }
+                }
+
+                if (!isEmpty(id)) {
+                    doPost('/ql/disableOtherCk', { id }).then(data => {
+                        //下一个版本用vue吧，状态管理太难受
+                        const indicators = document.querySelectorAll('.indicator');
+                        indicators.forEach(indicator => {
+                            indicator.classList.remove('enabled');
+                            indicator.classList.add('disabled');
+                        });
+                        const statusTexts = document.querySelectorAll('.status-text');
+                        statusTexts.forEach(st => {
+                            st.innerText = '禁用中';
+                        });
+
+                        const enableBtns = document.querySelectorAll('.enable-btn');
+                        enableBtns.forEach(bt => {
+                            bt.innerText = '启用';
+                        });
+
+
+                        var card = event.target.closest(".file-info-container");
+                        var status_text = card.querySelector(".status-text");
+                        status_text.innerText = '启用中';
+
+                        var indicator = card.querySelector(".indicator");
+                        indicator.classList.add('enabled');
+                        indicator.classList.remove('disabled');
+
+                        var enableBtn = card.querySelector(".enable-btn");
+                        enableBtn.innerText = '禁用';
+
+                    }).catch(error => {
+                        console.error('请求失败:', error);
+                    });
+                }
+            }
+
 
             if (event.target.classList.contains("ck-envs-select")) {
                 loadData('JD_COOKIE')
@@ -468,6 +549,13 @@
 
             let statusHtml = '<div class="indicator ' + (item.status == 0 ? 'enabled' : 'disabled') + '"></div> <span class="status-text">' + (item.status == 0 ? '启用中' : '禁用中') + '</span>';
 
+            let but2 = '';
+            if (item.value.indexOf('wskey=') > -1) {
+                but2 = '<button class="button wskey-ck-btn">单独转换</button>';
+            } else if (item.value.indexOf('pt_key=') > -1) {
+                but2 = '<button class="button disable-other-btn">禁用其他</button>';
+            }
+
             var html = '<div class="file-info-container">'
                 + '<div class="info">'
                 + '<div class="file-name">'
@@ -481,7 +569,7 @@
                 + '</div>'
                 + '<div class="buttons">'
                 + '<button class="button enable-btn" data-id="' + item.id + '">' + item.enableButText + '</button>'
-                + '<button class="button disable-other-btn">单独转换</button>'
+                + but2
                 + '<button class="button edit-btn">' + item.editText + '</button>'
                 + '</div>'
                 + '</div>'

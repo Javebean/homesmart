@@ -1,2 +1,3 @@
 node_modules
 data/upload/
+public/vue/js/*.js.map

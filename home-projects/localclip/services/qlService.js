@@ -4,20 +4,24 @@ const fs = require('fs');
 
 
 // 该路径可覆盖public下的index.html
-const indexSource = path.join(__dirname, '..', 'public', 'qlhelp.html');
-const indexDest = path.join(__dirname, '..', 'data', 'qlhelp.html');
+// const indexSource = path.join(__dirname, '..', 'public', 'qlhelp.html');
+// const indexDest = path.join(__dirname, '..', 'data', 'qlhelp.html');
+// let goQlIndex = function (res) {
+//     if (!fs.existsSync(indexDest)) {
+//         // indexpath
+//         fs.copyFile(indexSource, indexDest, (err) => {
+//             if (err) {
+//                 return console.error('文件复制失败：', err);
+//             }
+//             res.sendFile(indexDest);
+//         });
+//     } else {
+//         res.sendFile(indexDest);
+//     }
+// }
+const vueIndex = path.join(__dirname, '..', 'public', 'vue', 'index.html');
 let goQlIndex = function (res) {
-    if (!fs.existsSync(indexDest)) {
-        // indexpath
-        fs.copyFile(indexSource, indexDest, (err) => {
-            if (err) {
-                return console.error('文件复制失败：', err);
-            }
-            res.sendFile(indexDest);
-        });
-    } else {
-        res.sendFile(indexDest);
-    }
+    res.sendFile(vueIndex);
 }
 
 class QL {
@@ -233,9 +237,12 @@ module.exports = {
     toggleStatus,
     updateEnvById,
     getTypeEnv,
-    disableOther,
+    disableOtherCk,
+    disableEnvByName,
+    enableEnvByName,
     startRunCrons,
-    getCronsLog,
+    getCronsLogById,
+    getLatestWsckLog,
     goQlIndex,
     specifiedWskeyToCk
 };
@@ -250,8 +257,10 @@ async function updateEnvById(req, res, next) {
     let envs = await ql.getEnvs();
     const finded = envs.find(e => e.id == id);
 
+    let toCkRes = {};
     // 如果是wskey，只更新wskey的部分
     if (value.indexOf('wskey=') > -1) {
+
         const wsIndex = value.indexOf("wskey=");
         const index = value.indexOf(";", wsIndex);
         const result = value.substring(wsIndex, index + 1);
@@ -269,6 +278,9 @@ async function updateEnvById(req, res, next) {
         const pinEndIndex = value0.indexOf(";", pinIndex);
         const pin = value0.substring(pinIndex, pinEndIndex + 1);
         value = pin + result
+
+        const enableIds = envs.filter(e => e.name == 'JD_WSCK' && e.status == 0).map(e => e.id);
+        toCkRes = await wskeyToCk(id, enableIds);
     }
 
     const update_item = {
@@ -283,7 +295,7 @@ async function updateEnvById(req, res, next) {
         if (!status_res) {
             console.log('更新后，状态改变失败');
         }
-        res.json({ id: id, value: value, msg: '使用原pin值' });
+        res.json({ id: id, value: value, updateMsg: status_res ? "更新成功" : "更新失败", wskeyMsg: toCkRes.message });
     } else {
         res.status(500).send('更新环境变量失败');
     }
@@ -312,20 +324,62 @@ async function toggleStatus(req, res, next) {
     }
 }
 
-async function disableOther(req, res, next) {
+async function disableOtherCk(req, res, next) {
     let id = req.body.id;
-    let pageIds = req.body.pageIds;
 
-    if (!id || !pageIds) {
+    if (!id) {
         res.status(400).send("Bad Request");
     }
+    let envs = await ql.getEnvs();
+    const enableIds = envs.filter(e => e.name == 'JD_COOKIE' && e.status == 0).map(e => e.id);
 
     let status_res = false;
-    status_res = await ql.disableEnvStatus(pageIds);
+    status_res = await ql.disableEnvStatus(enableIds);
     status_res = await ql.enableEnvStatus([Number(id)]);
 
     if (status_res) {
         res.json({ id: id, status: 0 });
+    }
+}
+
+// 禁用 按名称
+async function disableEnvByName(req, res, next) {
+    let name = req.body.name;
+
+    if (!name) {
+        res.status(400).send("Bad Request");
+    }
+    let envs = await ql.getEnvs();
+    const enableIds = envs.filter(e => e.name == name && e.status == 0).map(e => e.id);
+
+    if (enableIds && enableIds.length > 0) {
+        let status_res = await ql.disableEnvStatus(enableIds);
+        if (status_res) {
+            res.json({ status: status_res });
+        }
+    } else {
+        res.json({ message: "没有查到名称为：" + name + " 的环境变量" });
+    }
+
+}
+
+// 启用 按名称
+async function enableEnvByName(req, res, next) {
+    let name = req.body.name;
+
+    if (!name) {
+        res.status(400).send("Bad Request");
+    }
+    let envs = await ql.getEnvs();
+    const disableIds = envs.filter(e => e.name == name && e.status == 1).map(e => e.id);
+
+    if (disableIds && disableIds.length > 0) {
+        let status_res = await ql.disableEnvStatus(disableIds);
+        if (status_res) {
+            res.json({ status: status_res });
+        }
+    } else {
+        res.json({ message: "没有查到名称为：" + name + " 的环境变量" });
     }
 }
 
@@ -335,30 +389,47 @@ async function specifiedWskeyToCk(id, pageIds) {
     }
 
     const envs = await ql.getEnvs();
-    const enableEnvs = envs.filter(e => e.status == 0 && pageIds.includes(e.id));
-    const enableIds = enableEnvs.map(e => e.id);
+    const enableIds = envs.filter(e => e.status == 0 && pageIds.includes(e.id)).map(e => e.id);
+
+    return wskeyToCk(id, enableIds);
+}
 
 
-    let result = false;
+async function wskeyToCk(id, enableIds) {
+    // 先禁用 enable
     result = await ql.disableEnvStatus(enableIds);
+
+    // 启用单独
     result = await ql.enableEnvStatus([id]);
 
-    let wskeyScriptId = 436;
-    // let wskeyScriptId = 355;
+    // let wskeyScriptId = 436;
+    let wskeyScriptId = 355; //测试任务id 茅台签到
     result = await ql.runCrons([wskeyScriptId]);
 
-    for (var i = 0; i < 10; i++) {
+    let message = "";
+    for (var i = 0; i < 30; i++) {
         const logText = await ql.getCronLog(wskeyScriptId);
-        if (logText.indexOf('执行结束') == -1) {
+        console.log("wskeyToCk log: " + logText);
+
+        if (logText.indexOf('执行结束') > 0 || logText.indexOf('秒后重试') > 0) {
+            if (logText.indexOf('执行结束') > 0) {
+                message = "执行成功"
+            } else {
+                message = "等待重试"
+            }
+            break;
+        } else {
             console.log('尝试 ' + i + " 次");
             await waitTime(1000);
-        } else {
-            result = await ql.enableEnvStatus(enableIds);
-            break;
         }
     }
-    return result;
+    //还原
+    result = await ql.enableEnvStatus(enableIds);
+    return { result, message: message || "wskey更新超时返回" }
 }
+
+
+
 
 const waitTime = (WAIT_TIME) => {
     return new Promise(resolve => {
@@ -369,9 +440,11 @@ const waitTime = (WAIT_TIME) => {
 async function getTypeEnv(req, res, next) {
     let type = req.body.type;
     let envs = await ql.getEnvs();
-    if (type && type !== 'all') {
+    if (type && type.toLowerCase() !== 'all') {
         envs = envs.filter(e => type == e.name);
     }
+    console.log(envs.length);
+
     res.json(envs);
 }
 
@@ -400,8 +473,8 @@ async function startRunCrons(req, res, next) {
 
 }
 
-async function getCronsLog(req, res, next) {
-    let id = req.body.id;
+async function getCronsLogById(id, res, next) {
+    // let id = req.body.id;
     if (!id) {
         res.status(400).send("Bad Request");
     }
@@ -410,9 +483,28 @@ async function getCronsLog(req, res, next) {
 
     const splitArray = logText.split(/\n+/).filter(Boolean);
 
-    let filterLog = splitArray.filter(e => e.indexOf('转换成功：') > -1 || e.indexOf('已禁用') > -1 || e.indexOf('执行结束') > -1);
+    let filterLog = splitArray.filter(e =>
+        e.indexOf('转换成功：') > -1
+        || e.indexOf('已禁用') > -1
+        || e.indexOf('执行结束') > -1
+        || e.indexOf('在获取token时失败') > -1
+    );
+
+    filterLog = filterLog.map(e => e.trim());
+
+
     let logs = filterLog.join('\n');
     res.json({ logs: logs });
+}
+
+async function getLatestWsckLog(req, res, next) {
+    let crons = await ql.getCrons();
+    const findItem = crons.find(e => e.name == 'wskey转换');
+    if (findItem) {
+        getCronsLogById(findItem.id, res);
+    } else {
+        res.status(200).send({ msg: '查找wskey任务失败' });
+    }
 }
 
 
