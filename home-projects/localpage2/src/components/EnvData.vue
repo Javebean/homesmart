@@ -37,7 +37,8 @@
 
     <div class="data-item" v-for="env in items" :key="env.id">
       <a-card :bodyStyle="{ padding: '10px' }" style="width: 100%">
-        <a-textarea :disabled="env.disabled" v-model:value="env.value" placeholder="请输入"
+        <a-textarea :disabled="env.disabled" v-model:value="env.value"
+          :placeholder="`请输入 ${env.remarks ? env.remarks + '的' + env.name : ''}`"
           :autoSize="env.value ? true : { minRows: 6, maxRows: 8 }" />
 
         <a-flex class="status-info" :justify="justify" :align="alignItems" wrap="wrap">

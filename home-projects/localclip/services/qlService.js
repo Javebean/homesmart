@@ -280,6 +280,22 @@ async function updateEnvById(req, res, next) {
             return;
         }
         value = (oldPin || newPin) + newWskey;
+    } else if (value.indexOf('pt_key=') > -1 && finded.name == 'JD_COOKIE') {
+        // 提取value中新的wskey
+        const newPtkey = getPinKeyFromEnv('pt_key', value);
+        console.log('新的ptkey' + newPtkey);
+        // 如果传参中有pin值，和原值对比
+        const newPtPin = getPinKeyFromEnv('pt_pin', value);
+        const oldPtPin = getPinKeyFromEnv('pt_pin', finded.value)
+        if (newPtPin && oldPtPin && newPtPin != oldPtPin) {
+            res.status(500).send({ msg: "新pt_pin值和旧pt_pin值不相同，请检查！", code: 1 });
+            return;
+        }
+        if (!newPtPin && !oldPtPin) {
+            res.status(500).send({ msg: "pt_pin值不存在，请检查！", code: 1 });
+            return;
+        }
+        value = newPtkey + (oldPtPin || newPtPin);
     }
 
     const update_item = {
@@ -462,15 +478,7 @@ function getPinKeyFromEnv(key, text) {
         return;
     }
 
-    let k = '';
-    if (key == 'pin') {
-        k = 'pin=';
-    } else if (key = 'wskey') {
-        k = 'wskey='
-    } else {
-        return null;
-    }
-
+    let k = key + '=';
     const start = text.indexOf(k);
     if (start > -1) {
         const end = text.indexOf(";", start);
