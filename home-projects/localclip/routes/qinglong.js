@@ -125,4 +125,14 @@ router.use('/getLatestWsckLog', async (req, res) => {
     }
 });
 
+router.use('/getCornTaskAndLog', async (req, res) => {
+    try {
+        let type = req.body.type;
+        return await ql.getCornTaskAndLog(type,res);
+    } catch (error) {
+        console.log(error);
+        res.status(500).send('Failed to get environment variables');
+    }
+});
+
 module.exports = router;

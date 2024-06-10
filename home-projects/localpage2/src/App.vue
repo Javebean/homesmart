@@ -1,7 +1,7 @@
 <template>
   <nav>
-    <router-link to="/env">Home</router-link> |
-    <router-link to="/about">About</router-link>
+    <router-link to="/env">环境变量</router-link> |
+    <router-link to="/task">任务</router-link>
   </nav>
   <StyleProvider hash-priority="high" :transformers="[legacyLogicalPropertiesTransformer]">
     <router-view />

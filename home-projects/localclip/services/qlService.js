@@ -172,8 +172,9 @@ class QL {
         }
     }
 
-    async getCrons() {
-        const url = `${this.address}/open/crons?searchValue=`;
+    // 简单搜索用searchValue,复杂的用queryString
+    async getCrons(searchValue, queryString) {
+        const url = `${this.address}/open/crons?searchValue=${searchValue}&page=1&size=1000&queryString=${queryString}`;
         const headers = { Authorization: this.auth };
         try {
             const response = await axios.get(url, { headers });
@@ -181,10 +182,14 @@ class QL {
             if (data.code === 200) {
                 return data.data.data;
             } else {
-                this.log(`获取环境变量失败：${data.message}`);
+                this.log(`获取任务列表失败：${data.message}`);
+                return null;
             }
         } catch (error) {
-            this.log(`获取环境变量失败：${error.message}`);
+            console.log(error.response.data);
+            console.log(error.response.data.validation);
+            this.log(`获取任务列表失败：${error.message}`);
+            return null;
         }
     }
 
@@ -206,8 +211,8 @@ class QL {
         }
     }
 
-    async getCronLog(env) {
-        const url = `${this.address}/open/crons/${env}/log`;
+    async getCronLog(cornId) {
+        const url = `${this.address}/open/crons/${cornId}/log`;
         const headers = { Authorization: this.auth };
         try {
             const response = await axios.get(url, { headers });
@@ -244,7 +249,8 @@ module.exports = {
     getCronsLogById,
     getLatestWsckLog,
     goQlIndex,
-    specifiedWskeyToCk
+    specifiedWskeyToCk,
+    getCornTaskAndLog
 };
 
 async function updateEnvById(req, res, next) {
@@ -418,6 +424,33 @@ async function specifiedWskeyToCk(id, pageIds) {
     return oneWskeyToCk(id, envs);
 }
 
+async function getCornTaskAndLog(type, res) {
+    if (!type) {
+        res.status(400).send("Bad Request");
+        return;
+    }
+    let queryString = '{"filters":null,"sorts":null,"filterRelation":"and"}';
+    let searchValue = '';
+    if (type == 'nongchang') {
+        searchValue = '农场';
+    } else if (type == 'ws') {
+        searchValue = 'wskey';
+    } else if (type == 'dapai') {
+        queryString = '{"filters":[{"property":"name","operation":"Reg","value":"大牌"},{"property":"name","operation":"Reg","value":"token"}],"sorts":null,"filterRelation":"or"}';
+    }
+    const envs = await ql.getCrons(searchValue, queryString);
+    for (const item of envs) {
+        try {
+            const logText = await ql.getCronLog(item.id);
+            item.log = logText;
+        } catch (error) {
+            console.error(`Failed to get log for item with id ${item.id}:`, error);
+        }
+    }
+    res.json(envs);
+    return;
+}
+
 // 转换一个wskey ->ck
 async function oneWskeyToCk(id, envs) {
     // 用来在最后还原原来状态
@@ -504,12 +537,13 @@ async function getTypeEnv(req, res, next) {
 
 async function startRunCrons(req, res, next) {
     let name = req.body.name;
-    let crons = await ql.getCrons();
 
     if (!name) {
         res.status(400).send("Bad Request");
+        return;
     }
 
+    let crons = await ql.getCrons(name, '');
     const findItem = crons.find(e => e.name == name);
 
     if (findItem) {
@@ -552,7 +586,7 @@ async function getCronsLogById(id, res, next) {
 }
 
 async function getLatestWsckLog(req, res, next) {
-    let crons = await ql.getCrons();
+    let crons = await ql.getCrons('wskey本地转换', '');
     const findItem = crons.find(e => e.name == 'wskey本地转换');
     if (findItem) {
         getCronsLogById(findItem.id, res);

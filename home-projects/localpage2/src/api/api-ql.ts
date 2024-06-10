@@ -55,3 +55,11 @@ export function getLatestWsckLog() {
         url: '/ql/getLatestWsckLog',
     })
 }
+
+export function getCornTaskAndLog(data = {}) {
+    return request({
+        method: 'POST',
+        url: '/ql/getCornTaskAndLog',
+        data
+    })
+}
