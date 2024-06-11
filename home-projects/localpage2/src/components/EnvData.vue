@@ -1,29 +1,10 @@
 <template>
   <div class="page">
-
-    <a-tabs size="large" :centered="true" v-model:activeKey="activeKey" @change="tab1change">
-      <a-tab-pane key="JD_WSCK">
-        <template #tab>
-          <span>
-            WSKEY
-          </span>
-        </template>
-      </a-tab-pane>
-      <a-tab-pane key="JD_COOKIE">
-        <template #tab>
-          <span>
-            CK
-          </span>
-        </template>
-      </a-tab-pane>
-      <a-tab-pane key="ALL">
-        <template #tab>
-          <span>
-            其他
-          </span>
-        </template>
-      </a-tab-pane>
-    </a-tabs>
+    <a-radio-group v-model:value="activeKey" @change="tab1change">
+      <a-radio-button value="JD_COOKIE">CK({{ enableCkNums }})</a-radio-button>
+      <a-radio-button value="JD_WSCK">WSKEY（{{enableWsNums}}）</a-radio-button>
+      <a-radio-button value="ALL">其他</a-radio-button>
+    </a-radio-group>
 
     <a-flex :justify="justify" :align="alignItems" wrap="wrap">
       <a-button @click="disableAllByType">禁用本页</a-button>
@@ -63,7 +44,7 @@
 <script lang="ts" setup>
 import { ref, getCurrentInstance, onMounted } from 'vue';
 // import { MailOutlined, AppstoreOutlined, SettingOutlined } from '@ant-design/icons-vue';
-import { message, Flex as AFlex, Textarea as ATextarea, Button as AButton, TabPane as ATabPane, Tabs as ATabs, Badge as ABadge, Card as ACard } from 'ant-design-vue';
+import { message, RadioButton as ARadioButton, RadioGroup as ARadioGroup, Flex as AFlex, Textarea as ATextarea, Button as AButton, Badge as ABadge, Card as ACard } from 'ant-design-vue';
 // import { message, Flex as AFlex} from 'ant-design-vue';
 //F1 -> reload window helped me
 // import { MenuProps } from 'ant-design-vue';
@@ -78,7 +59,9 @@ const { proxy }: any = getCurrentInstance()
 const justify = "space-between";
 const alignItems = "center";
 // 初始tab值
-const activeKey = ref('JD_WSCK');
+const activeKey = ref('JD_COOKIE');
+const enableCkNums = ref(0);
+const enableWsNums = ref(0);
 const wslog = ref('');
 
 onMounted(() => {
@@ -95,6 +78,11 @@ function getQlEnvsByName(name: string) {
       item.disabled = true;
       item.loading = false;
     });
+    if(name == 'JD_COOKIE'){
+      enableCkNums.value = data.filter((item: any) => item.status == 0).length;
+      } else if (name == "JD_WSCK"){
+        enableWsNums.value = data.filter((item: any) => item.status == 0).length;
+    }
     items.value = data;
   }).catch(function (error: any) {
     console.log(error);
@@ -193,9 +181,9 @@ function disableOtherCk(id: number) {
 
 // --------------- 顶部菜单-----------------
 // tab1 切换回调
-function tab1change(activeKey: string) {
-  // console.log(activeKey);
-  getQlEnvsByName(activeKey);
+function tab1change() {
+  console.log(activeKey.value);
+  getQlEnvsByName(activeKey.value);
 }
 
 // 启用本页

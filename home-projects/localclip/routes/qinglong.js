@@ -97,9 +97,9 @@ router.use('/specifiedWskeyToCk', async (req, res) => {
     }
 });
 
-router.use('/startRunCrons', async (req, res) => {
+router.use('/startStopCrons', async (req, res) => {
     try {
-        return await ql.startRunCrons(req, res);
+        return await ql.startStopCrons(req, res);
     } catch (error) {
         console.log(error);
         res.status(500).send('Failed to get environment variables');
@@ -125,10 +125,28 @@ router.use('/getLatestWsckLog', async (req, res) => {
     }
 });
 
+router.use('/getCornInfoById', async (req, res) => {
+    try {
+        return await ql.getCornInfoById(req, res);
+    } catch (error) {
+        console.log(error);
+        res.status(500).send('Failed to get environment variables');
+    }
+});
+
+router.use('/getLatestLogById', async (req, res) => {
+    try {
+        return await ql.getLatestLogById(req, res);
+    } catch (error) {
+        console.log(error);
+        res.status(500).send('Failed to get environment variables');
+    }
+});
+
 router.use('/getCornTaskAndLog', async (req, res) => {
     try {
         let type = req.body.type;
-        return await ql.getCornTaskAndLog(type,res);
+        return await ql.getCornTaskAndLog(type, res);
     } catch (error) {
         console.log(error);
         res.status(500).send('Failed to get environment variables');

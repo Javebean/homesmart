@@ -33,6 +33,7 @@ app.use('/upload', express.static(path.join(__dirname, 'data/upload')));
 //关于青龙
 app.use('/v', express.static(path.join(__dirname, 'public/vue'))); //v用来表示vue打包出来的
 app.use('/v/env', express.static(path.join(__dirname, 'public/vue/index.html'))); //路由页面
+app.use('/v/task', express.static(path.join(__dirname, 'public/vue/index.html'))); //路由页面
 
 // 注册路由
 app.use('/', indexRouter);

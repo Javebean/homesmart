@@ -56,10 +56,34 @@ export function getLatestWsckLog() {
     })
 }
 
+export function getCornInfoById(data = {}) {
+    return request({
+        method: 'POST',
+        url: '/ql/getCornInfoById',
+        data
+    })
+}
+
+export function getLatestLogById(data = {}) {
+    return request({
+        method: 'POST',
+        url: '/ql/getLatestLogById',
+        data
+    })
+}
+
 export function getCornTaskAndLog(data = {}) {
     return request({
         method: 'POST',
         url: '/ql/getCornTaskAndLog',
+        data
+    })
+}
+
+export function startStopCrons(data = {}) {
+    return request({
+        method: 'POST',
+        url: '/ql/startStopCrons',
         data
     })
 }

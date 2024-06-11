@@ -67,7 +67,9 @@ class QL {
                 this.log(`获取环境变量失败：${data.message}`);
             }
         } catch (error) {
-            this.log(`获取环境变量失败：${error.message}`);
+            this.log(`获取环境变量失败1：${error.message}`);
+            console.log(error.response.data);
+            console.log(error.response.data.validation);
         }
     }
 
@@ -85,7 +87,9 @@ class QL {
                 return false;
             }
         } catch (error) {
-            this.log(`删除环境变量失败：${error.message}`);
+            this.log(`删除环境变量失败1：${error.message}`);
+            console.log(error.response.data);
+            console.log(error.response.data.validation);
             return false;
         }
     }
@@ -105,6 +109,8 @@ class QL {
             }
         } catch (error) {
             this.log(`已存在键值唯一键: ${error.response.data.message}`);
+            console.log(error.response.data);
+            console.log(error.response.data.validation);
             return false;
         }
     }
@@ -123,9 +129,9 @@ class QL {
                 return false;
             }
         } catch (error) {
+            console.log(error.response.data);
             console.log(error.response.data.validation);
-
-            this.log(`更新环境变量失败：${error}`);
+            this.log(`更新环境变量失败1：${error}`);
             return false;
         }
     }
@@ -146,7 +152,7 @@ class QL {
         } catch (error) {
             console.log(error.response.data);
             console.log(error.response.data.validation);
-            this.log(`启用环境变量失败：${error}`);
+            this.log(`启用环境变量失败1：${error}`);
             return false;
         }
     }
@@ -167,7 +173,7 @@ class QL {
         } catch (error) {
             console.log(error.response.data);
             console.log(error.response.data.validation);
-            this.log(`禁用环境变量失败：${error}`);
+            this.log(`禁用环境变量失败1：${error}`);
             return false;
         }
     }
@@ -188,16 +194,16 @@ class QL {
         } catch (error) {
             console.log(error.response.data);
             console.log(error.response.data.validation);
-            this.log(`获取任务列表失败：${error.message}`);
+            this.log(`获取任务列表失败1：${error}`);
             return null;
         }
     }
 
-    async runCrons(env) {
+    async runCrons(id) {
         const url = `${this.address}/open/crons/run`;
         const headers = { Authorization: this.auth };
         try {
-            const response = await axios.put(url, env, { headers });
+            const response = await axios.put(url, id, { headers });
             const { data } = response;
             if (data.code === 200) {
                 return true;
@@ -206,7 +212,29 @@ class QL {
                 return false;
             }
         } catch (error) {
-            this.log(`运行失败：${error.message}`);
+            console.log(error.response.data);
+            console.log(error.response.data.validation);
+            this.log(`运行失败1：${error}`);
+            return false;
+        }
+    }
+
+    async stopCrons(id) {
+        const url = `${this.address}/open/crons/stop`;
+        const headers = { Authorization: this.auth };
+        try {
+            const response = await axios.put(url, id, { headers });
+            const { data } = response;
+            if (data.code === 200) {
+                return true;
+            } else {
+                this.log(`禁止失败：${data.message}`);
+                return false;
+            }
+        } catch (error) {
+            console.log(error.response.data);
+            console.log(error.response.data.validation);
+            this.log(`禁止失败1：${error}`);
             return false;
         }
     }
@@ -220,11 +248,13 @@ class QL {
             if (data.code === 200) {
                 return data.data;
             } else {
-                this.log(`获取日志成功${data.message}`);
+                this.log(`获取日志失败${data.message}`);
                 return false;
             }
         } catch (error) {
-            this.log(`获取日志失败：${error.message}`);
+            console.log(error.response.data);
+            console.log(error.response.data.validation);
+            this.log(`获取日志失败1：${error}`);
             return false;
         }
     }
@@ -244,10 +274,12 @@ module.exports = {
     getTypeEnv,
     disableOtherCk,
     disableEnvByName,
+    startStopCrons,
     enableEnvByName,
-    startRunCrons,
     getCronsLogById,
+    getLatestLogById,
     getLatestWsckLog,
+    getCornInfoById,
     goQlIndex,
     specifiedWskeyToCk,
     getCornTaskAndLog
@@ -437,14 +469,25 @@ async function getCornTaskAndLog(type, res) {
         searchValue = 'wskey';
     } else if (type == 'dapai') {
         queryString = '{"filters":[{"property":"name","operation":"Reg","value":"大牌"},{"property":"name","operation":"Reg","value":"token"}],"sorts":null,"filterRelation":"or"}';
+    } else if (type == 'running') {
+        queryString = '{"filters":[{"property":"status","operation":"Reg","value":"0"}],"sorts":null,"filterRelation":"and"}';
+    } else if (type == 'other') {
+        // 不包含农场 dapai 真正运行 0 
+        // 1 空闲 2 已禁用
+        queryString = '{"filters":[{"property":"name","operation":"NotReg","value":"农场"},{"property":"name","operation":"NotReg","value":"大牌"},{"property":"status","operation":"Nin","value":[0]}],"sorts":null,"filterRelation":"and"}';
+    } else if (type == 'top') {
+        queryString = '{"filters":[{"property":"isPinned","operation":"Reg","value":"1"}],"sorts":null,"filterRelation":"and"}';
     }
-    const envs = await ql.getCrons(searchValue, queryString);
+    let envs = await ql.getCrons(searchValue, queryString);
     for (const item of envs) {
-        try {
-            const logText = await ql.getCronLog(item.id);
+        if (item.status == 0) {
+            item.log = '正在运行,请刷新';
+        } else {
+            let logText = await ql.getCronLog(item.id);
+            logText = logText.replaceAll('===','');
+            logText = logText.replaceAll('---','');
+            logText = logText.replaceAll('>>>','');
             item.log = logText;
-        } catch (error) {
-            console.error(`Failed to get log for item with id ${item.id}:`, error);
         }
     }
     res.json(envs);
@@ -534,31 +577,29 @@ async function getTypeEnv(req, res, next) {
 
     res.json(envs);
 }
-
-async function startRunCrons(req, res, next) {
-    let name = req.body.name;
-
-    if (!name) {
+async function startStopCrons(req, res, next) {
+    let id = req.body.id;
+    if (!id) {
         res.status(400).send("Bad Request");
         return;
     }
 
-    let crons = await ql.getCrons(name, '');
-    const findItem = crons.find(e => e.name == name);
+    let searchValue = '';
+    let queryString = '{"filters":[{"property":"id","operation":"In","value":"' + id + '"}],"sorts":null,"filterRelation":"and"}';
+    let tasks = await ql.getCrons(searchValue, queryString);
 
-    if (findItem) {
-        const id = findItem.id;
-        console.log('执行脚本id:' + id + ", 脚本名称：" + findItem.name);
-
-        if (await ql.runCrons([id])) {
-            res.json({ id: id, code: 0 });
-        } else {
-            res.json({ id: id, msg: '执行脚本失败' });
+    if (tasks && tasks.length > 0) {
+        let task = tasks[0];
+        console.log('执行脚本id:' + id + ", 脚本名称：" + task.name);
+        if (task.status == 1 && await ql.runCrons([id])) {
+            res.status(200).json({ id: id, status: 0, msg: '运行任务成功' });
+            return;
+        } else if (task.status == 0 && await ql.stopCrons([id])) {
+            res.status(200).json({ id: id, status: 1, msg: '停止任务成功' });
+            return;
         }
-    } else {
-        res.status(200).send({ msg: '查找wskey任务失败' });
     }
-
+    res.status(500).json({ id: id, msg: '执行脚本失败' });
 }
 
 async function getCronsLogById(id, res, next) {
@@ -592,6 +633,40 @@ async function getLatestWsckLog(req, res, next) {
         getCronsLogById(findItem.id, res);
     } else {
         res.status(200).send({ msg: '查找wskey任务失败' });
+    }
+}
+
+async function getLatestLogById(req, res, next) {
+    let id = req.body.id;
+    if (!id) {
+        res.status(400).send("Bad Request");
+        return;
+    }
+
+    let log = await ql.getCronLog(id);
+    if (log) {
+        res.status(200).send({ log: log });
+    } else {
+        res.status(500);
+    }
+}
+
+async function getCornInfoById(req, res, next) {
+    let id = req.body.id;
+    if (!id) {
+        res.status(400).send("Bad Request");
+        return;
+    }
+
+    let searchValue = '';
+    let queryString = '{"filters":[{"property":"id","operation":"In","value":"' + id + '"}],"sorts":null,"filterRelation":"and"}';
+    let tasks = await ql.getCrons(searchValue, queryString);
+
+    const findItem = tasks.find(e => e.id == id);
+    if (findItem) {
+        res.status(200).send({ data: findItem });
+    } else {
+        res.status(500);
     }
 }
 
