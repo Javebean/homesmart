@@ -484,12 +484,16 @@ async function getCornTaskAndLog(type, res) {
             item.log = '正在运行,请刷新';
         } else {
             let logText = await ql.getCronLog(item.id);
-            logText = logText.replaceAll('===','');
-            logText = logText.replaceAll('---','');
-            logText = logText.replaceAll('>>>','');
+            logText = logText.replaceAll('===', '');
+            logText = logText.replaceAll('---', '');
+            logText = logText.replaceAll('>>>', '');
+            logText = logText.replaceAll('****', '');
             item.log = logText;
         }
     }
+
+    //按上次执行时间 从大到小排序
+    envs.sort((a, b) => b.last_execution_time - a.last_execution_time)
     res.json(envs);
     return;
 }
@@ -643,9 +647,13 @@ async function getLatestLogById(req, res, next) {
         return;
     }
 
-    let log = await ql.getCronLog(id);
-    if (log) {
-        res.status(200).send({ log: log });
+    let logText = await ql.getCronLog(id);
+    if (logText) {
+        logText = logText.replaceAll('===', '');
+        logText = logText.replaceAll('---', '');
+        logText = logText.replaceAll('>>>', '');
+        logText = logText.replaceAll('****', '');
+        res.status(200).send({ log: logText });
     } else {
         res.status(500);
     }
