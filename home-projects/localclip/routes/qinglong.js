@@ -116,6 +116,16 @@ router.use('/getCronsLog', async (req, res) => {
     }
 });
 
+router.use('/getTaskLogsByIds', async (req, res) => {
+    try {
+        let ids = req.body.ids;
+        return await ql.getTaskLogsByIds(ids, res);
+    } catch (error) {
+        console.log(error);
+        res.status(500).send('Failed to get environment variables');
+    }
+});
+
 router.use('/getLatestWsckLog', async (req, res) => {
     try {
         return await ql.getLatestWsckLog(req, res);

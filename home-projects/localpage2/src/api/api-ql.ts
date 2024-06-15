@@ -72,6 +72,14 @@ export function getLatestLogById(data = {}) {
     })
 }
 
+export function getTaskLogsByIds(data = {}) {
+    return request({
+        method: 'POST',
+        url: '/ql/getTaskLogsByIds',
+        data
+    })
+}
+
 export function getCornTaskAndLog(data = {}) {
     return request({
         method: 'POST',

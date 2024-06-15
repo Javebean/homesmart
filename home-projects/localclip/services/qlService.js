@@ -2,6 +2,7 @@ const axios = require('axios');
 const path = require('path')
 const fs = require('fs');
 const cronParser = require('cron-parser');
+const { env } = require('process');
 
 // 该路径可覆盖public下的index.html
 // const indexSource = path.join(__dirname, '..', 'public', 'qlhelp.html');
@@ -282,7 +283,8 @@ module.exports = {
     getCornInfoById,
     goQlIndex,
     specifiedWskeyToCk,
-    getCornTaskAndLog
+    getCornTaskAndLog,
+    getTaskLogsByIds
 };
 
 async function updateEnvById(req, res, next) {
@@ -497,6 +499,9 @@ async function getCornTaskAndLog(type, res) {
     }
     let queryString = '{"filters":null,"sorts":null,"filterRelation":"and"}';
     let searchValue = '';
+
+    let queryObj = { filters: null, sorts: null, filterRelation: "and" }
+
     if (type == 'nongchang') {
         searchValue = '农场';
     } else if (type == 'ws') {
@@ -514,91 +519,76 @@ async function getCornTaskAndLog(type, res) {
     } else if (type == 'top') {
         queryString = '{"filters":[{"property":"isPinned","operation":"Reg","value":"1"}],"sorts":null,"filterRelation":"and"}';
     } else if (type == 'all') {
-    }
-    let envs = await ql.getCrons(searchValue, queryString);
-
-    if (type == 'today') {
-        envs = envs.filter(e => {
-            if (e.status == 0) {
-                // 正在运行
-                return true;
-            }
-            return e.isDisabled == 0 && e.schedule && hasCronExecuted(e.schedule);
-        })
-    }
-    if (type == 'todayOnce') {
-        envs = envs.filter(e => {
-            if (e.status == 0) {
-                // 正在运行
-                return true;
-            }
-            return e.isDisabled == 0 && e.schedule && hasCronExecutedTodayOnce(e.schedule);
-        })
+    } else if (type == 'today') {
+        let filtersArr = [
+            { "property": "isDisabled", "operation": "Reg", "value": "0" },
+        ]
+        queryObj.filters = filtersArr;
+        queryString = JSON.stringify(queryObj);
+    } else if (type == 'todayOnce') {
+        let filtersArr = [
+            { "property": "isDisabled", "operation": "Reg", "value": "0" },
+        ]
+        queryObj.filters = filtersArr;
+        queryString = JSON.stringify(queryObj);
     }
 
     console.time('executionTime');
-    for (const item of envs) {
-        if (item.status == 0) {
-            item.log = '正在运行,请刷新';
-        } else {
-            let logText = await ql.getCronLog(item.id);
-            logText = logText.replaceAll('===', '');
-            logText = logText.replaceAll('---', '');
-            logText = logText.replaceAll('>>>', '');
-            logText = logText.replaceAll('****', '');
-            item.log = logText;
-        }
+    //条件查询出的结果
+    let envs = await ql.getCrons(searchValue, queryString);
+
+    const daystart = new Date();
+    daystart.setHours(0, 0, 0, 0)
+    if (type == 'today') {
+        envs = envs.filter(e => e.status == 0 || e.last_execution_time * 1000 > daystart.getTime());
     }
-    console.timeEnd('executionTime');
+
+    const dayEnd = new Date();
+    dayEnd.setHours(23, 59, 59, 999)
+    if (type == 'todayOnce') {
+        envs = envs.filter(e => e.status == 0 || e.last_execution_time * 1000 > daystart.getTime() && hasCronExecutedTodayOnce(e.schedule, dayEnd));
+    }
+
     //按上次执行时间 从大到小排序
     envs.sort((a, b) => {
-        // 首先比较 status，status=0 的排在前面
+        // 正在运行的排前面
         if (a.status !== b.status) {
             return a.status - b.status;
         }
         // 如果 status 相同，则根据 last_execution_time 排序
-        if(type == 'todayOnce'){
+        if (type == 'todayOnce') {
             return a.last_execution_time - b.last_execution_time;
-        }else{
+        } else {
             return b.last_execution_time - a.last_execution_time;
         }
     });
+
+    let length = envs.length;
+    for (let i = 0; i < length; i++) {
+        let breakNum = 4;
+        if (i > breakNum) {
+            break;
+        }
+        let item = envs[i];
+        if (item.status == 0) {
+            item.log = '正在运行,请刷新';
+        } else {
+            let logText = await ql.getCronLog(item.id);
+            item.log = getFiltedLog(logText);
+        }
+    }
+    console.timeEnd('executionTime');
     res.json(envs);
     return;
 }
 
-function hasCronExecuted(cronExpression) {
+function hasCronExecutedTodayOnce(cronExpression, dayEnd) {
     // 获取当前时间
-    const daystart = new Date();
-    daystart.setHours(0, 0, 0, 0)
-
     try {
         const interval = cronParser.parseExpression(cronExpression);
-        // 获取上一个执行时间
-        const prevExecution = interval.prev();
-
-        // 如果上一个执行时间在今日
-        return prevExecution.getTime() >= daystart.getTime() && prevExecution.getTime() <= Date.now();
-    } catch (err) {
-        console.log(err);
-        throw new Error('Invalid cron expression');
-    }
-}
-function hasCronExecutedTodayOnce(cronExpression) {
-    // 获取当前时间
-    const daystart = new Date();
-    daystart.setHours(0, 0, 0, 0);
-    const dayEnd = new Date();
-    dayEnd.setHours(23, 59, 59, 999)
-
-    try {
-        const interval = cronParser.parseExpression(cronExpression);
-        // 获取上一个执行时间
-        const prevTime = interval.prev().getTime();
         const nextExeTime = interval.next().getTime();
-
         // 如果上一个执行时间在今日
-        return prevTime >= daystart.getTime() && prevTime <= Date.now() && nextExeTime > dayEnd.getTime();
+        return nextExeTime > dayEnd.getTime();
     } catch (err) {
         console.log(err);
         throw new Error('Invalid cron expression');
@@ -664,7 +654,6 @@ function getPinKeyFromEnv(key, text) {
     if (!key || !text) {
         return;
     }
-
     let k = key + '=';
     const start = text.indexOf(k);
     if (start > -1) {
@@ -674,7 +663,13 @@ function getPinKeyFromEnv(key, text) {
     return null;
 }
 
-
+function getFiltedLog(logText) {
+    logText = logText.replaceAll('===', '');
+    logText = logText.replaceAll('---', '');
+    logText = logText.replaceAll('>>>', '');
+    logText = logText.replaceAll('****', '');
+    return logText;
+}
 
 async function getTypeEnv(req, res, next) {
     let type = req.body.type;
@@ -745,6 +740,19 @@ async function getLatestWsckLog(req, res, next) {
     } else {
         res.status(200).send({ msg: '查找wskey任务失败' });
     }
+}
+
+// 根据id集合得到日志
+async function getTaskLogsByIds(ids, res, next) {
+    let result = [];
+    for (let i = 0; i < ids.length; i++) {
+        let id = ids[i];
+        let log = await ql.getCronLog(id);
+        let item = { id, log: getFiltedLog(log) }
+        result.push(item);
+    }
+    res.json({ result });
+    return;
 }
 
 async function getLatestLogById(req, res, next) {

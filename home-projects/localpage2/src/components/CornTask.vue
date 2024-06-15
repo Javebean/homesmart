@@ -53,6 +53,7 @@ const dataList = ref([]);
 const todayCount = ref(0);
 const todayOnceCount = ref(0);
 const dataLoading = ref(true);
+const noLogTaskIds = ref([]);
 
 function getCornTaskAndLog(name: string) {
   dataLoading.value = true;
@@ -63,14 +64,54 @@ function getCornTaskAndLog(name: string) {
 
     if (name == 'today') {
       todayCount.value = data.length;
-    } else if(name == 'todayOnce'){
+    } else if (name == 'todayOnce') {
       todayOnceCount.value = data.length
     }
 
+    // 收集没有log的任务id
+    noLogTaskIds.value = data.filter((e: any) => !e.log).map((e: any) => e.id);
+    getSubArrays(6,activeKey.value)
   }).catch(function (error: any) {
     console.log(error);
   }).finally(() => {
     dataLoading.value = false;
+  });
+}
+
+async function getSubArrays(m: number,type:string) {
+  const n = noLogTaskIds.value.length;
+  if (noLogTaskIds.value.length > 0) {
+    for (let i = 0; i < n; i += m) {
+      let childArr = noLogTaskIds.value.slice(i, i + m);
+      if (childArr.length > 0 && type == activeKey.value) {
+        console.log('--', childArr,type,activeKey.value);
+        getTaskLogsByIds(childArr)
+        await waitTime(1000);
+      }
+    }
+  }
+}
+
+const waitTime = (WAIT_TIME: number) => {
+  return new Promise(resolve => {
+    setTimeout(resolve, WAIT_TIME)
+  });
+}
+
+// 根据ids得到日志
+function getTaskLogsByIds(ids: any) {
+  proxy.$api.QL.getTaskLogsByIds({ ids }).then((response: any) => {
+    let logsArr = response.data.result;
+    for (let i = 0; i < logsArr.length; i++) {
+      let id = logsArr[i].id;
+      let task = dataList.value.find(e => e.id == id);
+
+      task.log = logsArr[i].log;
+      // console.log(task.log);
+    }
+  }).catch(function (error: any) {
+    console.log(error);
+  }).finally(() => {
   });
 }
 
