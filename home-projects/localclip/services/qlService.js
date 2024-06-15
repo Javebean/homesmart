@@ -1,7 +1,7 @@
 const axios = require('axios');
 const path = require('path')
 const fs = require('fs');
-
+const cronParser = require('cron-parser');
 
 // 该路径可覆盖public下的index.html
 // const indexSource = path.join(__dirname, '..', 'public', 'qlhelp.html');
@@ -318,13 +318,18 @@ async function updateEnvById(req, res, next) {
             return;
         }
         value = (oldPin || newPin) + newWskey;
+        const oldWskey = getPinKeyFromEnv('wskey', finded.value);
+        if (newWskey == oldWskey) { // status -1 :无变化
+            res.status(200).send({ msg: "wskey无变动", code: 0, status: -1, value });
+            return;
+        }
     } else if (value.indexOf('pt_key=') > -1 && finded.name == 'JD_COOKIE') {
         // 提取value中新的wskey
         const newPtkey = getPinKeyFromEnv('pt_key', value);
         console.log('新的ptkey' + newPtkey);
         // 如果传参中有pin值，和原值对比
         const newPtPin = getPinKeyFromEnv('pt_pin', value);
-        const oldPtPin = getPinKeyFromEnv('pt_pin', finded.value)
+        const oldPtPin = getPinKeyFromEnv('pt_pin', finded.value);
         if (newPtPin && oldPtPin && newPtPin != oldPtPin) {
             res.status(500).send({ msg: "新pt_pin值和旧pt_pin值不相同，请检查！", code: 1 });
             return;
@@ -334,6 +339,12 @@ async function updateEnvById(req, res, next) {
             return;
         }
         value = newPtkey + (oldPtPin || newPtPin);
+
+        const oldPtkey = getPinKeyFromEnv('pt_key', finded.value);
+        if (newPtkey == oldPtkey) {// status -1 :无变化
+            res.status(200).send({ msg: "ck无变动", code: 0, status: -1, value });
+            return;
+        }
     }
 
     const update_item = {
@@ -345,19 +356,42 @@ async function updateEnvById(req, res, next) {
     if (await ql.updateEnv(update_item)) {
         //更新成功把状态改成启用
         let update = await ql.enableEnvStatus([Number(id)]);
-        if (value.indexOf('wskey') == -1) {
-            if (update) {
-                res.status(200).send({ msg: '更新并启用成功', value, status: 0, code: 0 });
+        if (value.indexOf('wskey=') > -1) {
+            let wsUpdate = await oneWskeyToCk(id, envs);
+            let remarkMsg = finded.remarks
+            if (finded.remarks) {
+                if (finded.remarks.indexOf('ws') == -1) {
+                    remarkMsg = finded.remarks + "ws";
+                } else {
+                    remarkMsg = finded.remarks;
+                }
+            }
+            if (wsUpdate) {
+                res.status(200).send({ msg: remarkMsg + '更新成功，ck转换成功！', status: 0, value, code: 0 });
             } else {
-                res.status(500).send({ msg: '更新成功，启用失败', code: 1 });
+                res.status(500).send({ msg: remarkMsg + '更新成功，ck转换失败！', code: 1 });
+            }
+            return;
+        } else if (value.indexOf('pt_key=') > -1) {
+            let remarkMsg = finded.remarks
+            if (finded.remarks) {
+                if (finded.remarks.indexOf('ck') == -1) {
+                    remarkMsg = finded.remarks + "ck";
+                } else {
+                    remarkMsg = finded.remarks;
+                }
+            }
+            if (update) {
+                res.status(200).send({ msg: remarkMsg + '更新成功，启用成功！', status: 0, value, code: 0 });
+            } else {
+                res.status(500).send({ msg: remarkMsg + '更新成功，启用失败！', code: 1 });
             }
             return;
         } else {
-            let wsUpdate = await oneWskeyToCk(id, envs);
-            if (wsUpdate) {
-                res.status(200).send({ msg: 'wskey更新成功，ck转换成功！', status: 0, value, code: 0 });
+            if (update) {
+                res.status(200).send({ msg: '更新成功，启用成功！', value, status: 0, code: 0 });
             } else {
-                res.status(500).send({ msg: 'wskey更新成功，ck转换失败！', code: 1 });
+                res.status(500).send({ msg: '更新成功，启用失败！', code: 1 });
             }
             return;
         }
@@ -469,16 +503,40 @@ async function getCornTaskAndLog(type, res) {
         searchValue = 'wskey';
     } else if (type == 'dapai') {
         queryString = '{"filters":[{"property":"name","operation":"Reg","value":"大牌"},{"property":"name","operation":"Reg","value":"token"}],"sorts":null,"filterRelation":"or"}';
-    } else if (type == 'running') {
-        queryString = '{"filters":[{"property":"status","operation":"Reg","value":"0"}],"sorts":null,"filterRelation":"and"}';
-    } else if (type == 'other') {
+    }
+    // else if (type == 'running') {
+    //     queryString = '{"filters":[{"property":"status","operation":"Reg","value":"0"}],"sorts":null,"filterRelation":"and"}';
+    // } 
+    else if (type == 'other') {
         // 不包含农场 dapai 真正运行 0 
         // 1 空闲 2 已禁用
         queryString = '{"filters":[{"property":"name","operation":"NotReg","value":"农场"},{"property":"name","operation":"NotReg","value":"大牌"},{"property":"status","operation":"Nin","value":[0]}],"sorts":null,"filterRelation":"and"}';
     } else if (type == 'top') {
         queryString = '{"filters":[{"property":"isPinned","operation":"Reg","value":"1"}],"sorts":null,"filterRelation":"and"}';
+    } else if (type == 'all') {
     }
     let envs = await ql.getCrons(searchValue, queryString);
+
+    if (type == 'today') {
+        envs = envs.filter(e => {
+            if (e.status == 0) {
+                // 正在运行
+                return true;
+            }
+            return e.isDisabled == 0 && e.schedule && hasCronExecuted(e.schedule);
+        })
+    }
+    if (type == 'todayOnce') {
+        envs = envs.filter(e => {
+            if (e.status == 0) {
+                // 正在运行
+                return true;
+            }
+            return e.isDisabled == 0 && e.schedule && hasCronExecutedTodayOnce(e.schedule);
+        })
+    }
+
+    console.time('executionTime');
     for (const item of envs) {
         if (item.status == 0) {
             item.log = '正在运行,请刷新';
@@ -491,11 +549,60 @@ async function getCornTaskAndLog(type, res) {
             item.log = logText;
         }
     }
-
+    console.timeEnd('executionTime');
     //按上次执行时间 从大到小排序
-    envs.sort((a, b) => b.last_execution_time - a.last_execution_time)
+    envs.sort((a, b) => {
+        // 首先比较 status，status=0 的排在前面
+        if (a.status !== b.status) {
+            return a.status - b.status;
+        }
+        // 如果 status 相同，则根据 last_execution_time 排序
+        if(type == 'todayOnce'){
+            return a.last_execution_time - b.last_execution_time;
+        }else{
+            return b.last_execution_time - a.last_execution_time;
+        }
+    });
     res.json(envs);
     return;
+}
+
+function hasCronExecuted(cronExpression) {
+    // 获取当前时间
+    const daystart = new Date();
+    daystart.setHours(0, 0, 0, 0)
+
+    try {
+        const interval = cronParser.parseExpression(cronExpression);
+        // 获取上一个执行时间
+        const prevExecution = interval.prev();
+
+        // 如果上一个执行时间在今日
+        return prevExecution.getTime() >= daystart.getTime() && prevExecution.getTime() <= Date.now();
+    } catch (err) {
+        console.log(err);
+        throw new Error('Invalid cron expression');
+    }
+}
+function hasCronExecutedTodayOnce(cronExpression) {
+    // 获取当前时间
+    const daystart = new Date();
+    daystart.setHours(0, 0, 0, 0);
+    const dayEnd = new Date();
+    dayEnd.setHours(23, 59, 59, 999)
+
+    try {
+        const interval = cronParser.parseExpression(cronExpression);
+        // 获取上一个执行时间
+        const prevTime = interval.prev().getTime();
+        const nextExeTime = interval.next().getTime();
+
+        // 如果上一个执行时间在今日
+        return prevTime >= daystart.getTime() && prevTime <= Date.now() && nextExeTime > dayEnd.getTime();
+    } catch (err) {
+        console.log(err);
+        throw new Error('Invalid cron expression');
+    }
 }
 
 // 转换一个wskey ->ck

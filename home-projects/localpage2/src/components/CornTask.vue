@@ -1,19 +1,20 @@
 <template>
   <div class="container">
-    <a-radio-group v-model:value="activeKey" @change="tab1change">
+    <a-radio-group size="small" v-model:value="activeKey" @change="tab1change">
       <a-radio-button value="top">置顶</a-radio-button>
       <a-radio-button value="nongchang">农场</a-radio-button>
       <a-radio-button value="dapai">大牌</a-radio-button>
-      <a-radio-button value="running">正在运行</a-radio-button>
-      <a-radio-button value="other">其他</a-radio-button>
+      <a-radio-button value="today">今日({{ todayCount }})</a-radio-button>
+      <a-radio-button value="todayOnce">已完成({{ todayOnceCount }})</a-radio-button>
+      <a-radio-button value="all">全部</a-radio-button>
     </a-radio-group>
     <div v-show="dataLoading">
       <a-spin />
     </div>
-    <div v-show="!dataLoading" v-for="da in dataList" :key="da.id" >
-      <a-card class="card-item" :bodyStyle="{padding:'10px'}"
+    <div v-show="!dataLoading" v-for="da in dataList" :key="da.id">
+      <a-card class="card-item" :bodyStyle="{ padding: '10px' }"
         :title="da.name + ' ' + formatTimestamp(da.last_execution_time) + isToday(da.last_execution_time)">
-        <div>corn: {{da.schedule}}</div>
+        <div>corn: {{ da.schedule }}</div>
         <div class="task-log">
           {{ da.log }}
         </div>
@@ -49,6 +50,8 @@ onMounted(() => {
 
 // 定义一个 ref 来存储服务器返回的数据
 const dataList = ref([]);
+const todayCount = ref(0);
+const todayOnceCount = ref(0);
 const dataLoading = ref(true);
 
 function getCornTaskAndLog(name: string) {
@@ -57,6 +60,13 @@ function getCornTaskAndLog(name: string) {
     const data = response.data
     // console.log(data);
     dataList.value = data;
+
+    if (name == 'today') {
+      todayCount.value = data.length;
+    } else if(name == 'todayOnce'){
+      todayOnceCount.value = data.length
+    }
+
   }).catch(function (error: any) {
     console.log(error);
   }).finally(() => {

@@ -2,7 +2,7 @@
   <div class="page">
     <a-radio-group v-model:value="activeKey" @change="tab1change">
       <a-radio-button value="JD_COOKIE">CK({{ enableCkNums }})</a-radio-button>
-      <a-radio-button value="JD_WSCK">WSKEY（{{enableWsNums}}）</a-radio-button>
+      <a-radio-button value="JD_WSCK">WSKEY（{{ enableWsNums }}）</a-radio-button>
       <a-radio-button value="ALL">其他</a-radio-button>
     </a-radio-group>
 
@@ -26,7 +26,8 @@
           <div>备注： {{ env.remarks }}</div>
           <div>变量名：{{ env.name }}</div>
           <div>状态：<a-badge :color="env.status === 0 ? 'green' : 'red'" />{{ env.status === 0 ? "启用中" : "禁用中" }}</div>
-          <div>更新日期：{{ formatDateString(env.timestamp) }}</div>
+          <div>时长：{{ getTimeDifference(env.timestamp) }} </div>
+          <div>更新日期：{{ formatDateString(env.timestamp) }} </div>
         </a-flex>
         <a-flex :justify="justify" :align="alignItems">
           <a-button type="primary" @click="toggleQlEnvStatus(env.id)">{{ env.status === 0 ? "禁用" : "启用" }}</a-button>
@@ -78,10 +79,10 @@ function getQlEnvsByName(name: string) {
       item.disabled = true;
       item.loading = false;
     });
-    if(name == 'JD_COOKIE'){
+    if (name == 'JD_COOKIE') {
       enableCkNums.value = data.filter((item: any) => item.status == 0).length;
-      } else if (name == "JD_WSCK"){
-        enableWsNums.value = data.filter((item: any) => item.status == 0).length;
+    } else if (name == "JD_WSCK") {
+      enableWsNums.value = data.filter((item: any) => item.status == 0).length;
     }
     items.value = data;
   }).catch(function (error: any) {
@@ -130,7 +131,9 @@ function saveQlEnv(id: number) {
     proxy.$api.QL.updateEnvById({ id: id, value: itemToUpdate.value }).then((response: any) => {
       const data = response.data
       itemToUpdate.value = data.value;
-      itemToUpdate.status = data.status;
+      if (data.status != -1) {
+        itemToUpdate.status = data.status;
+      }
       console.log(data);
       messageApi.success({
         content: () => data.msg,
@@ -237,6 +240,42 @@ function formatDateString(dateString: string) {
   // 格式化日期为 YYYY-MM-DD HH:mm:ss
   const formattedDate = `${year}-${month}-${day} ${time}`;
   return formattedDate;
+}
+
+function getTimeDifference(dateString: string) {
+  dateString = formatDateString(dateString);
+
+  // 将日期字符串转换为 Date 对象
+  const givenDate: Date = new Date(dateString);
+  const now: Date = new Date();
+
+  // 验证日期是否有效
+  if (isNaN(givenDate.getTime())) {
+    throw new Error('Invalid date format');
+  }
+
+  // 计算时间差（以毫秒为单位）
+  const diffMillis: number = now.getTime() - givenDate.getTime();
+
+  // 将毫秒转换为分钟、小时和天数
+  const millisPerMinute: number = 1000 * 60;
+  const millisPerHour: number = millisPerMinute * 60;
+  const millisPerDay: number = millisPerHour * 24;
+
+  const minutes: number = diffMillis / millisPerMinute;
+  const hours: number = diffMillis / millisPerHour;
+  const days: number = Math.floor(hours / 24);
+  const remainingHours: number = Math.floor(hours % 24);
+  const remainingMinutes: number = Math.floor(minutes % 60);
+
+  // 返回格式化的时间差
+  if (minutes < 60) {
+    return `${Math.floor(minutes)}分钟`;
+  } else if (hours < 24) {
+    return `${Math.floor(hours)}小时${remainingMinutes}分钟`;
+  } else {
+    return `${days}天${remainingHours}小时${remainingMinutes}分钟`;
+  }
 }
 </script>
 
