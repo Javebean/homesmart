@@ -9,7 +9,8 @@
     <a-flex :justify="justify" :align="alignItems" wrap="wrap">
       <a-button @click="disableAllByType">禁用本页</a-button>
       <a-button @click="enableAllByType">启用本页</a-button>
-      <a-button @click="selectLatestWsckLog">查看最新wskey日志</a-button>
+      <a-button v-show="activeKey=='JD_COOKIE'" @click="startStopCrons(372)">ck检测</a-button>
+      <a-button @click="selectLatestWsckLog">wskey日志</a-button>
     </a-flex>
 
     <div class="ws-log">
@@ -121,7 +122,7 @@ function saveQlEnv(id: number) {
       content: () => '无更新',
       class: 'custom-class',
       style: {
-        marginTop: '5vh',
+        marginTop: '300px',
       },
     });
 
@@ -139,7 +140,7 @@ function saveQlEnv(id: number) {
         content: () => data.msg,
         class: 'custom-class',
         style: {
-          marginTop: '5vh',
+          marginTop: '300px',
         },
       });
     }).catch(function (error: any) {
@@ -148,7 +149,7 @@ function saveQlEnv(id: number) {
         content: () => error.response.data.msg,
         class: 'custom-class',
         style: {
-          marginTop: '5vh',
+          marginTop: '300px',
         },
       });
     }).finally(() => {
@@ -174,7 +175,7 @@ function disableOtherCk(id: number) {
       content: () => '禁用成功',
       class: 'custom-class',
       style: {
-        marginTop: '5vh',
+        marginTop: '300px',
       },
     });
   }).catch(function (error: any) {
@@ -218,6 +219,29 @@ function selectLatestWsckLog() {
     wslog.value = response.data.logs;
   }).catch(function (error: any) {
     console.log(error);
+  });
+}
+
+function startStopCrons(id: number) {
+  proxy.$api.QL.startStopCrons({ id: id }).then((response: any) => {
+    const data = response.data
+    messageApi.success({
+      content: () => data.msg,
+      class: 'custom-class',
+      style: {
+        marginTop: '300px',
+      },
+    });
+  }).catch(function (error: any) {
+    console.log(error.response.data.msg);
+    messageApi.error({
+      content: () => error.response.data.msg,
+      class: 'custom-class',
+      style: {
+        marginTop: '300px',
+      },
+    });
+  }).finally(() => {
   });
 }
 

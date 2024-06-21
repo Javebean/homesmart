@@ -679,9 +679,40 @@ async function getTypeEnv(req, res, next) {
     } else {
         envs = envs.filter(e => e.name != 'JD_WSCK' && e.name != 'JD_COOKIE');
     }
-    console.log(envs.length);
+    // console.log(envs.length);
+
+    envs.sort((a, b) => {
+        // 被禁用的排前面
+        if (a.status !== b.status) {
+            return b.status - a.status;
+        } else {
+            //timestamp更新新值的时间，updatedAt是任何变动的更新时间
+            return formatDateString(a.timestamp) > formatDateString(b.timestamp) ? 1 : -1;
+        }
+    });
 
     res.json(envs);
+}
+
+//utils
+function formatDateString(dateString) {
+    // 将日期字符串拆分为数组
+    const dateParts = dateString.split(' ');
+    // 月份映射
+    const monthMap = {
+        Jan: '01', Feb: '02', Mar: '03', Apr: '04', May: '05', Jun: '06',
+        Jul: '07', Aug: '08', Sep: '09', Oct: '10', Nov: '11', Dec: '12'
+    };
+
+    // 提取年、月、日和时间部分
+    const day = dateParts[2];
+    const month = monthMap[dateParts[1]];
+    const year = dateParts[3];
+    const time = dateParts[4];
+
+    // 格式化日期为 YYYY-MM-DD HH:mm:ss
+    const formattedDate = `${year}-${month}-${day} ${time}`;
+    return formattedDate;
 }
 async function startStopCrons(req, res, next) {
     let id = req.body.id;

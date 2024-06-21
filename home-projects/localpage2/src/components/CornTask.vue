@@ -124,7 +124,7 @@ function startStopCrons(id: number) {
       content: () => data.msg,
       class: 'custom-class',
       style: {
-        marginTop: '5vh',
+        marginTop: '300px',
       },
     });
   }).catch(function (error: any) {
@@ -133,7 +133,7 @@ function startStopCrons(id: number) {
       content: () => error.response.data.msg,
       class: 'custom-class',
       style: {
-        marginTop: '5vh',
+        marginTop: '300px',
       },
     });
   }).finally(() => {
@@ -150,7 +150,7 @@ function getLatestTaskLog(id: number) {
       content: () => '刷新成功',
       class: 'custom-class',
       style: {
-        marginTop: '5vh',
+        marginTop: '300px',
       },
     });
   }).catch(function (error: any) {
@@ -159,7 +159,7 @@ function getLatestTaskLog(id: number) {
       content: () => '获取日志失败',
       class: 'custom-class',
       style: {
-        marginTop: '5vh',
+        marginTop: '300px',
       },
     });
   }).finally(() => {
