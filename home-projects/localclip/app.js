@@ -10,10 +10,10 @@ var usersRouter = require('./routes/users');
 var qlRouter = require('./routes/qinglong');
 
 var app = express();
-if (process.env.NODE_ENV === 'development') {
-  const cors = require('cors');
-  app.use(cors());
-}
+// if (process.env.NODE_ENV === 'development') {
+const cors = require('cors');
+app.use(cors());
+// }
 
 // view engine setup
 app.set('views', path.join(__dirname, 'views'));

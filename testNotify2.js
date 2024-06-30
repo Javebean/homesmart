@@ -18,10 +18,11 @@ let NOTIFY_PRO = ['6dylan6_jdpro_jd'];
 // 启用通知的具体任务名 （一个完整的日志文件夹形如：6dylan6_jdpro_jd_speed_sign_xx）新版文件夹有_xx数字后缀
 let WHITELIST2 = [
     { script: 'jd_wsck', name: 'ck', sendText: ['转换失败'] },
-    { script: 'jd_fruit_', name: '新旧农场', sendText: ['京东账号', '水果进度','【种植进度】'] },
-    { script: 'jd_speed_sign', name: '极速签到',  sendText: ['结束'] },
+    { script: 'jd_fruit_', name: '新旧农场', sendText: ['京东账号', '水果进度', '【种植进度】'] },
+    { script: 'jd_speed_sign', name: '极速签到', sendText: ['结束'] },
     { script: 'jd_dwapp', name: '积分话费', sendText: ['总积分'] },
-    { script: 'jd_bean_change', name: '资产统计', sendText: ['【账号', '红包总额','当前京豆','话费积分'],blackText:['账号信息'] },
+    { script: 'jd_bean_change', name: '资产统计', sendText: ['【账号', '红包总额', '当前京豆', '话费积分','玩一玩奖票'], blackText: ['账号信息'] },
+    { script: 'jd_wyw_ffl', name: '玩一玩-翻翻乐', sendText: ['开始【京东账号', '当前奖票总量', '翻倍成功', '翻倍失败'], blackText: [] },
 ];
 
 
@@ -36,6 +37,7 @@ let nickNameMap = [
     { ID: 'jd_6cc96411fe998', nick: '2626' },
     { ID: 'jd_UdFBUuRwgSZz', nick: 'bro' },
     { ID: 'wdfsDgQuBuEEce', nick: 'jiang' },
+    { ID: 'jd_3e0019580e3b0', nick: 'mon' },
 ];
 
 
@@ -52,8 +54,9 @@ function taskStart() {
             console.error('发生错误：', err);
         } else {
             try {
-                SEND_TIME_LOG = JSON.parse(data);
-                // SEND_TIME_LOG = JSON.parse("{}");
+                // SEND_TIME_LOG = JSON.parse(data);
+                // 测试用
+                SEND_TIME_LOG = JSON.parse("{}");
             } catch (e) {
             }
             console.log('发送时间日志：', SEND_TIME_LOG);
@@ -75,7 +78,7 @@ function loopLogDirs() {
             filterLogDirs = filterLogDirs.filter((curLogFolder) =>
                 filterList(curLogFolder, WHITELIST2)
             );
-           
+
 
             let len = filterLogDirs.length;
             if (len == 0) {
@@ -155,13 +158,22 @@ async function processLineByLine(mode, log_folder, latestTime) {
 
         // lv2 过滤skip
         if (mode && mode.sendText.length > 0) {
+
+            if (mode.script == 'jd_fruit_' && line.indexOf('东东农场-任务, 开始!') > -1) {
+                mode.name = "旧农场"
+            } else if (mode.script == 'jd_fruit_' && line.indexOf('新农场任务, 开始!') > -1) {
+                mode.name = "新农场"
+            }
+
             if (someOfArr(line, mode.sendText) || line.indexOf('执行结束') > -1) {
                 // 过滤 --- ==== *** 符号
                 if (line.indexOf("*****") > -1 || line.indexOf("-----") > -1 || line.indexOf("=====") > -1) {
-                    continue;
+                    // continue;
+                    line = line.replace(/[*=-]+/g, '');
+                    // line = "=="+line+"==";
                 }
 
-                if(mode.blackText && someOfArr(line, mode.blackText)){
+                if (mode.blackText && someOfArr(line, mode.blackText)) {
                     continue;
                 }
 

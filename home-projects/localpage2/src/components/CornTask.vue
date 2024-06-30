@@ -1,12 +1,18 @@
 <template>
   <div class="container">
     <a-radio-group size="small" v-model:value="activeKey" @change="tab1change">
-      <a-radio-button value="top">置顶</a-radio-button>
+      <a-radio-button v-for="tab in tabViews" :value="tab.id">{{ tab.name }}({{ getTabCronNums(tab.id)
+        }})</a-radio-button>
+    </a-radio-group>
+    <a-radio-group size="small" v-model:value="activeKey" @change="tab2change">
+      <a-radio-button value="top">置顶({{ getTabCronNums("top") }})</a-radio-button>
+      <a-radio-button value="today">今日({{ getTabCronNums("today") }})</a-radio-button>
+      <a-radio-button value="todayOnce">已完成({{ getTabCronNums("todayOnce") }})</a-radio-button>
+      <a-radio-button value="future">下次运行({{ getTabCronNums("future") }})</a-radio-button>
+      <!-- 
       <a-radio-button value="nongchang">农场</a-radio-button>
       <a-radio-button value="dapai">大牌</a-radio-button>
-      <a-radio-button value="today">今日({{ todayCount }})</a-radio-button>
-      <a-radio-button value="todayOnce">已完成({{ todayOnceCount }})</a-radio-button>
-      <a-radio-button value="all">全部</a-radio-button>
+      <a-radio-button value="all">全部</a-radio-button> -->
     </a-radio-group>
     <div v-show="dataLoading">
       <a-spin />
@@ -14,7 +20,7 @@
     <div v-show="!dataLoading" v-for="da in dataList" :key="da.id">
       <a-card class="card-item" :bodyStyle="{ padding: '10px' }"
         :title="da.name + ' ' + formatTimestamp(da.last_execution_time) + isToday(da.last_execution_time)">
-        <div>corn: {{ da.schedule }}</div>
+        <div>corn: {{ da.schedule }} {{ formatHHMM(da.nextExeTime) }}</div>
         <div class="task-log">
           {{ da.log }}
         </div>
@@ -41,11 +47,8 @@ const [messageApi, contextHolder] = message.useMessage();
 const justify = "space-between";
 const alignItems = "center";
 
-const activeKey = ref<string>('nongchang');
-
-
 onMounted(() => {
-  getCornTaskAndLog('nongchang')
+  getCronsViews();
 })
 
 // 定义一个 ref 来存储服务器返回的数据
@@ -54,23 +57,28 @@ const todayCount = ref(0);
 const todayOnceCount = ref(0);
 const dataLoading = ref(true);
 const noLogTaskIds = ref([]);
+const tabViews = ref([]);
+const tabViewNums = ref([]);
+const activeKey = ref('');
+// const activeKey2 = ref('');
 
-function getCornTaskAndLog(name: string) {
+//青龙原生tab视图
+function getCornTaskAndLog(tab: any) {
   dataLoading.value = true;
-  proxy.$api.QL.getCornTaskAndLog({ type: name }).then((response: any) => {
+  proxy.$api.QL.getCornTaskAndLog(tab).then((response: any) => {
     const data = response.data
     // console.log(data);
     dataList.value = data;
 
-    if (name == 'today') {
-      todayCount.value = data.length;
-    } else if (name == 'todayOnce') {
-      todayOnceCount.value = data.length
-    }
+
+    // 显示每个tab的数量
+    let tabNums = { 'tabKey': tab.id + '_num', 'tabNums': data.length };
+    tabViewNums.value.push(tabNums);
 
     // 收集没有log的任务id
     noLogTaskIds.value = data.filter((e: any) => !e.log).map((e: any) => e.id);
-    getSubArrays(6,activeKey.value)
+    console.log(noLogTaskIds.value.length + "条任务无日志");
+    getSubArrays(6, activeKey.value.toString())
   }).catch(function (error: any) {
     console.log(error);
   }).finally(() => {
@@ -78,13 +86,37 @@ function getCornTaskAndLog(name: string) {
   });
 }
 
-async function getSubArrays(m: number,type:string) {
+//自定义视图
+function getCornTaskAndLog2(name: string) {
+  dataLoading.value = true;
+  proxy.$api.QL.getCornTaskAndLog2({ type: name }).then((response: any) => {
+    const data = response.data
+    // console.log(data);
+    dataList.value = data;
+
+    // 显示每个tab的数量
+    let tabNums = { 'tabKey': name + '_num', 'tabNums': data.length };
+    tabViewNums.value.push(tabNums);
+
+    // 收集没有log的任务id
+    noLogTaskIds.value = data.filter((e: any) => !e.log).map((e: any) => e.id);
+    console.log(noLogTaskIds.value.length + "条任务无日志");
+    getSubArrays(6, activeKey.value.toString())
+  }).catch(function (error: any) {
+    console.log(error);
+  }).finally(() => {
+    dataLoading.value = false;
+  });
+}
+
+//一次抓取m条日志
+async function getSubArrays(m: number, type: string) {
   const n = noLogTaskIds.value.length;
   if (noLogTaskIds.value.length > 0) {
     for (let i = 0; i < n; i += m) {
       let childArr = noLogTaskIds.value.slice(i, i + m);
       if (childArr.length > 0 && type == activeKey.value) {
-        console.log('--', childArr,type,activeKey.value);
+        console.log('--', childArr, type, activeKey.value);
         getTaskLogsByIds(childArr)
         await waitTime(1000);
       }
@@ -166,11 +198,35 @@ function getLatestTaskLog(id: number) {
   });
 }
 
+function getCronsViews() {
+  proxy.$api.QL.getCronsViews().then((response: any) => {
+    const data = response.data
+    console.log(response.data);
+    tabViews.value = response.data;
+    activeKey.value = response.data[0].id;
+    getCornTaskAndLog(response.data[0])
+  }).catch(function (error: any) {
+
+  }).finally(() => {
+  });
+}
+
+function getTabCronNums(tabName: any) {
+  let tab = tabViewNums.value.find(x => x.tabKey == tabName + '_num');
+  return tab ? tab.tabNums : 0;
+}
+
 // --------------- 顶部菜单-----------------
 // tab1 切换回调
 function tab1change() {
+  let curTab = tabViews.value.find(x => x.id == activeKey.value)
+  // console.log(curTab,activeKey.value);
+  //获取任务和日志
+  getCornTaskAndLog(curTab);
+}
+function tab2change() {
   console.log(activeKey.value);
-  getCornTaskAndLog(activeKey.value);
+  getCornTaskAndLog2(activeKey.value);
 }
 
 function formatTimestamp(timestamp: number) {
@@ -188,6 +244,16 @@ function formatTimestamp(timestamp: number) {
   const formattedDate = `${month}-${day} ${hours}:${minutes}`;
   // 返回结果对象
   return formattedDate;
+}
+function formatHHMM(timestamp: number) {
+  if (!timestamp) {
+    return '';
+  }
+  // 将时间戳转换为毫秒
+  const date = new Date(timestamp);
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  return `，下次执行：${hours}:${minutes}`;
 }
 
 function isToday(timestamp: number) {

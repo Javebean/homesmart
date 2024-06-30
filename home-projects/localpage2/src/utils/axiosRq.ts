@@ -3,7 +3,8 @@ import router from "../router";
 
 let baseURL = '/';
 if (process.env.NODE_ENV != "production") {
-    baseURL = 'http://192.168.1.3:3000/';
+    // baseURL = 'http://localhost:3000/';
+    baseURL = 'http://192.168.1.18:3000/';
     console.log('开发ip:' + baseURL);
 }
 const request = axios.create({

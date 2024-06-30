@@ -72,6 +72,14 @@ export function getLatestLogById(data = {}) {
     })
 }
 
+export function getCronsViews(data = {}) {
+    return request({
+        method: 'GET',
+        url: '/ql/getCronsViews',
+        data
+    })
+}
+
 export function getTaskLogsByIds(data = {}) {
     return request({
         method: 'POST',
@@ -80,10 +88,20 @@ export function getTaskLogsByIds(data = {}) {
     })
 }
 
+//青龙自带tab views
 export function getCornTaskAndLog(data = {}) {
     return request({
         method: 'POST',
         url: '/ql/getCornTaskAndLog',
+        data
+    })
+}
+
+//自定义tab
+export function getCornTaskAndLog2(data = {}) {
+    return request({
+        method: 'POST',
+        url: '/ql/getCornTaskAndLog2',
         data
     })
 }

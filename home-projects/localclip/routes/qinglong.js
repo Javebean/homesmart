@@ -35,6 +35,15 @@ router.use('/getTypeEnv', async (req, res) => {
     }
 });
 
+router.use('/getCronsViews', async (req, res) => {
+    try {
+        await ql.getCronsViews(req, res);
+    } catch (error) {
+        console.log(error);
+        res.status(500).send('Failed to get environment variables');
+    }
+});
+
 router.use('/toggleStatus', async (req, res) => {
     try {
         return await ql.toggleStatus(req, res);
@@ -155,8 +164,17 @@ router.use('/getLatestLogById', async (req, res) => {
 
 router.use('/getCornTaskAndLog', async (req, res) => {
     try {
+        return await ql.getCornTaskAndLog(req, res);
+    } catch (error) {
+        console.log(error);
+        res.status(500).send('Failed to get environment variables');
+    }
+});
+
+router.use('/getCornTaskAndLog2', async (req, res) => {
+    try {
         let type = req.body.type;
-        return await ql.getCornTaskAndLog(type, res);
+        return await ql.getCornTaskAndLog2(type, res);
     } catch (error) {
         console.log(error);
         res.status(500).send('Failed to get environment variables');

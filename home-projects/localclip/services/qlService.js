@@ -260,11 +260,35 @@ class QL {
         }
     }
 
-}
+    async getViews() {
+        const url = `${this.address}/open/crons/views`;
+        const headers = { Authorization: this.auth };
+        try {
+            const response = await axios.get(url, { headers });
+            const { data } = response;
+            if (data.code === 200) {
+                return data.data;
+            } else {
+                this.log(`获取视图失败：${data.message}`);
+            }
+        } catch (error) {
+            this.log(`获取视图失败1：${error.message}`);
+            console.log(error.response.data);
+            console.log(error.response.data.validation);
+        }
+    }
 
-const address = "http://192.168.1.12:5700";
-const client_id = "Zq6jz-PT_j-Q";
-const client_secret = "VWcvopV-8LEp0tIYoXl0t9D6";
+}
+console.log(process.env.NODE_ENV);
+
+let address = 'http://' + process.env.client_address + ':' + process.env.client_port;
+let client_id = process.env.client_id;
+let client_secret = process.env.client_secret;
+if (process.env.NODE_ENV == 'development') {
+    address = "http://192.168.1.12:5700";
+    client_id = "Zq6jz-PT_j-Q";
+    client_secret = "VWcvopV-8LEp0tIYoXl0t9D6";
+}
 
 const ql = new QL(address, client_id, client_secret);
 
@@ -273,6 +297,7 @@ module.exports = {
     toggleStatus,
     updateEnvById,
     getTypeEnv,
+    getCronsViews,
     disableOtherCk,
     disableEnvByName,
     startStopCrons,
@@ -284,6 +309,7 @@ module.exports = {
     goQlIndex,
     specifiedWskeyToCk,
     getCornTaskAndLog,
+    getCornTaskAndLog2,
     getTaskLogsByIds
 };
 
@@ -442,6 +468,12 @@ async function disableOtherCk(req, res, next) {
     }
 }
 
+async function getCronsViews(req, res, next) {
+    let views = await ql.getViews();
+    let enableViews = views.filter(x => x.isDisabled == 0)
+    res.json(enableViews);
+}
+
 // 禁用 按名称
 async function disableEnvByName(req, res, next) {
     let name = req.body.name;
@@ -492,7 +524,7 @@ async function specifiedWskeyToCk(id, pageIds) {
     return oneWskeyToCk(id, envs);
 }
 
-async function getCornTaskAndLog(type, res) {
+async function getCornTaskAndLog2(type, res) {
     if (!type) {
         res.status(400).send("Bad Request");
         return;
@@ -502,23 +534,18 @@ async function getCornTaskAndLog(type, res) {
 
     let queryObj = { filters: null, sorts: null, filterRelation: "and" }
 
-    if (type == 'nongchang') {
-        searchValue = '农场';
-    } else if (type == 'ws') {
-        searchValue = 'wskey';
-    } else if (type == 'dapai') {
-        queryString = '{"filters":[{"property":"name","operation":"Reg","value":"大牌"},{"property":"name","operation":"Reg","value":"token"}],"sorts":null,"filterRelation":"or"}';
-    }
-    // else if (type == 'running') {
-    //     queryString = '{"filters":[{"property":"status","operation":"Reg","value":"0"}],"sorts":null,"filterRelation":"and"}';
-    // } 
-    else if (type == 'other') {
+    if (type == 'other') {
         // 不包含农场 dapai 真正运行 0 
         // 1 空闲 2 已禁用
         queryString = '{"filters":[{"property":"name","operation":"NotReg","value":"农场"},{"property":"name","operation":"NotReg","value":"大牌"},{"property":"status","operation":"Nin","value":[0]}],"sorts":null,"filterRelation":"and"}';
     } else if (type == 'top') {
-        queryString = '{"filters":[{"property":"isPinned","operation":"Reg","value":"1"}],"sorts":null,"filterRelation":"and"}';
-    } else if (type == 'all') {
+        let filtersArr = [
+            { "property": "isPinned", "operation": "Reg", "value": "1" },
+        ]
+        queryObj.filters = filtersArr;
+        queryString = JSON.stringify(queryObj);
+
+
     } else if (type == 'today') {
         let filtersArr = [
             { "property": "isDisabled", "operation": "Reg", "value": "0" },
@@ -536,17 +563,24 @@ async function getCornTaskAndLog(type, res) {
     console.time('executionTime');
     //条件查询出的结果
     let envs = await ql.getCrons(searchValue, queryString);
+    // console.log(envs.length);
 
     const daystart = new Date();
     daystart.setHours(0, 0, 0, 0)
     if (type == 'today') {
-        envs = envs.filter(e => e.status == 0 || e.last_execution_time * 1000 > daystart.getTime());
+        envs = envs.filter(e => e.last_execution_time * 1000 > daystart.getTime());
     }
 
     const dayEnd = new Date();
     dayEnd.setHours(23, 59, 59, 999)
     if (type == 'todayOnce') {
-        envs = envs.filter(e => e.status == 0 || e.last_execution_time * 1000 > daystart.getTime() && hasCronExecutedTodayOnce(e.schedule, dayEnd));
+        envs = envs.filter(e => e.last_execution_time * 1000 > daystart.getTime() && !willRunToday(e, dayEnd));
+    }
+
+    //下次将要执行
+    if (type == 'future') {
+        envs = envs.filter(e => e.isDisabled == 0 && nextRunInToday(e, daystart, dayEnd));
+        console.log(type, envs.length);
     }
 
     //按上次执行时间 从大到小排序
@@ -558,6 +592,8 @@ async function getCornTaskAndLog(type, res) {
         // 如果 status 相同，则根据 last_execution_time 排序
         if (type == 'todayOnce') {
             return a.last_execution_time - b.last_execution_time;
+        } else if (type == 'future') {
+            return a.nextExeTime - b.nextExeTime;
         } else {
             return b.last_execution_time - a.last_execution_time;
         }
@@ -572,6 +608,8 @@ async function getCornTaskAndLog(type, res) {
         let item = envs[i];
         if (item.status == 0) {
             item.log = '正在运行,请刷新';
+        } else if (item.last_execution_time == 0) {
+            item.log = '任务未运行';
         } else {
             let logText = await ql.getCronLog(item.id);
             item.log = getFiltedLog(logText);
@@ -582,13 +620,73 @@ async function getCornTaskAndLog(type, res) {
     return;
 }
 
-function hasCronExecutedTodayOnce(cronExpression, dayEnd) {
+async function getCornTaskAndLog(req, res) {
+    let body = req.body;
+    if (!body) {
+        res.status(400).send("Bad Request");
+        return;
+    }
+
+    let queryObj = { filters: body.filters, sorts: body.sorts, filterRelation: body.filterRelation }
+    queryString = JSON.stringify(queryObj);
+    // console.log(queryString,body);
+    //条件查询出的结果
+    let envs = await ql.getCrons("", queryString);
+
+    //按上次执行时间 从大到小排序
+    envs.sort((a, b) => {
+        // 正在运行的排前面
+        if (a.status !== b.status) {
+            return a.status - b.status;
+        } else {
+            return b.last_execution_time - a.last_execution_time;
+        }
+    });
+
+    //加载日志
+    let length = envs.length;
+    for (let i = 0; i < length; i++) {
+        let breakNum = 4;
+        if (i > breakNum) {
+            break;
+        }
+        let item = envs[i];
+        if (item.status == 0) {
+            item.log = '正在运行,请刷新';
+        } else if (item.last_execution_time == 0) {
+            item.log = '任务未运行';
+        } else {
+            let logText = await ql.getCronLog(item.id);
+            item.log = getFiltedLog(logText);
+        }
+    }
+    res.json(envs);
+    return;
+}
+
+function willRunToday(cron, dayEnd) {
     // 获取当前时间
     try {
+        let cronExpression = cron.schedule;
         const interval = cronParser.parseExpression(cronExpression);
         const nextExeTime = interval.next().getTime();
-        // 如果上一个执行时间在今日
-        return nextExeTime > dayEnd.getTime();
+        cron.nextExeTime = nextExeTime;
+        return nextExeTime < dayEnd.getTime();
+    } catch (err) {
+        console.log(err);
+        throw new Error('Invalid cron expression');
+    }
+}
+
+function nextRunInToday(cron, dayStart, dayEnd) {
+    // 获取当前时间
+    try {
+        let cronExpression = cron.schedule;
+        const interval = cronParser.parseExpression(cronExpression);
+        const nextExeTime = interval.next().getTime();
+        cron.nextExeTime = nextExeTime;
+        // console.log(cronExpression,nextExeTime,dayStart.getTime(),dayEnd.getTime());
+        return nextExeTime > dayStart.getTime() && nextExeTime < dayEnd.getTime();
     } catch (err) {
         console.log(err);
         throw new Error('Invalid cron expression');

@@ -9,8 +9,9 @@
     <a-flex :justify="justify" :align="alignItems" wrap="wrap">
       <a-button @click="disableAllByType">禁用本页</a-button>
       <a-button @click="enableAllByType">启用本页</a-button>
-      <a-button v-show="activeKey=='JD_COOKIE'" @click="startStopCrons(372)">ck检测</a-button>
-      <a-button @click="selectLatestWsckLog">wskey日志</a-button>
+      <a-button v-show="activeKey == 'JD_COOKIE'" @click="startStopCrons(372)">ck检测</a-button>
+      <a-button v-show="activeKey == 'JD_COOKIE'" @click="getLatestTaskLog(372)">ck日志</a-button>
+      <a-button v-show="activeKey != 'JD_COOKIE'" @click="getLatestTaskLog(436)">wskey日志</a-button>
     </a-flex>
 
     <div class="ws-log">
@@ -125,7 +126,7 @@ function saveQlEnv(id: number) {
         marginTop: '300px',
       },
     });
-
+    window.scrollTo({ top: 0, behavior: 'auto' });
     itemToUpdate.disabled = true;
   } else {
     itemToUpdate.loading = true
@@ -135,6 +136,12 @@ function saveQlEnv(id: number) {
       if (data.status != -1) {
         itemToUpdate.status = data.status;
       }
+
+      //把更新成功之后的移动到数组末尾
+      const newArr = items.value.filter(item => item.id != id);
+      newArr.push(itemToUpdate);
+      items.value = newArr;
+
       console.log(data);
       messageApi.success({
         content: () => data.msg,
@@ -155,6 +162,7 @@ function saveQlEnv(id: number) {
     }).finally(() => {
       itemToUpdate.loading = false;
       itemToUpdate.disabled = true;
+      window.scrollTo({ top: 0, behavior: 'auto' });
     });
   }
 }
@@ -188,6 +196,8 @@ function disableOtherCk(id: number) {
 function tab1change() {
   console.log(activeKey.value);
   getQlEnvsByName(activeKey.value);
+  //清空log
+  wslog.value = '';
 }
 
 // 启用本页
@@ -212,13 +222,33 @@ function enableAllByType() {
   });
 }
 
-// 查看wskey最新日志
+// 废弃 - 查看wskey最新日志
 function selectLatestWsckLog() {
   proxy.$api.QL.getLatestWsckLog().then((response: any) => {
     console.log(response.data);
     wslog.value = response.data.logs;
   }).catch(function (error: any) {
     console.log(error);
+  });
+}
+
+function getLatestTaskLog(id: number) {
+  if (wslog.value) {
+    wslog.value = '';
+    return;
+  }
+  proxy.$api.QL.getLatestLogById({ id: id }).then((response: any) => {
+    wslog.value = response.data.log;
+  }).catch(function (error: any) {
+    // console.log(error.response.data.msg);
+    messageApi.error({
+      content: () => '获取日志失败',
+      class: 'custom-class',
+      style: {
+        marginTop: '300px',
+      },
+    });
+  }).finally(() => {
   });
 }
 
@@ -313,6 +343,12 @@ function getTimeDifference(dateString: string) {
 .ws-log {
   white-space: pre-wrap;
   text-align: left;
+  max-height: 300px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  margin-bottom: 10px;
+  text-align: left;
+  font-size: 12px;
 }
 
 .data-item {
