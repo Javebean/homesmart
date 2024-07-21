@@ -56,8 +56,9 @@ class QL {
         }
     }
 
-    async getEnvs() {
-        const url = `${this.address}/open/envs?searchValue=`;
+    async getEnvs(searchValue) {
+        searchValue = searchValue || '';
+        const url = `${this.address}/open/envs?searchValue=${searchValue}`;
         const headers = { Authorization: this.auth };
         try {
             const response = await axios.get(url, { headers });
@@ -69,8 +70,8 @@ class QL {
             }
         } catch (error) {
             this.log(`获取环境变量失败1：${error.message}`);
-            console.log(error.response.data);
-            console.log(error.response.data.validation);
+            console.log(error);
+            return [];
         }
     }
 
@@ -110,6 +111,7 @@ class QL {
             }
         } catch (error) {
             this.log(`已存在键值唯一键: ${error.response.data.message}`);
+            console.log(error.response.data.code);
             console.log(error.response.data);
             console.log(error.response.data.validation);
             return false;
@@ -187,7 +189,14 @@ class QL {
             const response = await axios.get(url, { headers });
             const { data } = response;
             if (data.code === 200) {
-                return data.data.data;
+                console.log('get定时任务：', data);
+                if (data.data.data) {
+                    return data.data.data;
+                } else {
+                    //老版本
+                    return data.data;
+                }
+
             } else {
                 this.log(`获取任务列表失败：${data.message}`);
                 return null;
@@ -279,7 +288,7 @@ class QL {
     }
 
 }
-console.log(process.env.NODE_ENV);
+console.log('开发环境：' + process.env.NODE_ENV);
 
 let address = 'http://' + process.env.client_address + ':' + process.env.client_port;
 let client_id = process.env.client_id;
@@ -289,6 +298,8 @@ if (process.env.NODE_ENV == 'development') {
     client_id = "Zq6jz-PT_j-Q";
     client_secret = "VWcvopV-8LEp0tIYoXl0t9D6";
 }
+console.log('ql帐号：', address, client_id, client_secret);
+
 
 const ql = new QL(address, client_id, client_secret);
 
@@ -296,6 +307,9 @@ module.exports = {
     QL: ql,
     toggleStatus,
     updateEnvById,
+    addEnvs,
+    parseWsck,
+    parseWsck2,
     getTypeEnv,
     getCronsViews,
     disableOtherCk,
@@ -310,7 +324,10 @@ module.exports = {
     specifiedWskeyToCk,
     getCornTaskAndLog,
     getCornTaskAndLog2,
-    getTaskLogsByIds
+    getTaskLogsByIds,
+    backupEnv,
+    getBackupEnvList,
+    getInitInfo,
 };
 
 async function updateEnvById(req, res, next) {
@@ -468,10 +485,75 @@ async function disableOtherCk(req, res, next) {
     }
 }
 
+async function getInitInfo(req, res, next) {
+    let queryObj = { filters: null, sorts: null, filterRelation: "or" }
+    let filtersArr = [
+        { "property": "name", "operation": "Reg", "value": "ck检测" },
+        { "property": "name", "operation": "Reg", "value": "CK检测" },
+        { "property": "name", "operation": "Reg", "value": "ws" },
+    ]
+    queryObj.filters = filtersArr;
+    let envs = await ql.getCrons('', JSON.stringify(queryObj));
+    res.json({ data: envs, code: 0 });
+}
+
+async function getBackupEnvList(req, res, next) {
+    // 指定的目录
+    const dataPath = path.join(__dirname, '..', 'data');
+    // 指定文件名的开头
+    const prefix = 'qlEnv_backup_';
+    // 读取目录内容
+    fs.readdir(dataPath, (err, files) => {
+        if (err) {
+            console.error('Error reading directory:', err);
+            res.json({ data: [], code: 1 });
+            return;
+        }
+        // 过滤出以指定前缀开头的文件
+        const backfiles = files.filter(file => file.startsWith(prefix));
+        res.json({ data: backfiles, code: 0 });
+    });
+}
+
+async function backupEnv(req, res, next) {
+    let envs = await ql.getEnvs();
+
+    const dataPath = path.join(__dirname, '..', 'data');
+    if (!fs.existsSync(dataPath)) {
+        fs.mkdirSync(dataPath, { recursive: true });
+    }
+
+    // 生成文件名
+    const now = new Date();
+    const timestamp = now.toISOString().replace(/[-:.]/g, '').slice(0, 15);
+    const filename = `qlEnv_backup_${timestamp}.json`;
+
+    // 完整的文件路径
+    const filePath = path.join(dataPath, filename);
+
+    // 将对象转换为 JSON 字符串
+    const jsonData = JSON.stringify(envs, null, 2);
+
+    // 将 JSON 数据写入文件
+    fs.writeFile(filePath, jsonData, 'utf8', (err) => {
+        if (err) {
+            console.error('Error saving file:', err);
+            res.json({ status: 1 });
+        } else {
+            console.log('File saved successfully:', filePath);
+            res.json({ status: 0, filename });
+        }
+    });
+}
+
 async function getCronsViews(req, res, next) {
     let views = await ql.getViews();
-    let enableViews = views.filter(x => x.isDisabled == 0)
-    res.json(enableViews);
+    if (views) {
+        let enableViews = views.filter(x => x.isDisabled == 0)
+        res.json(enableViews);
+    } else {
+        res.json([]);
+    }
 }
 
 // 禁用 按名称
@@ -515,13 +597,142 @@ async function enableEnvByName(req, res, next) {
     }
 }
 
-async function specifiedWskeyToCk(id, pageIds) {
-    if (!id || !pageIds) {
+async function specifiedWskeyToCk(req, res) {
+    let wskey = req.body.wskey;
+    let parseWsck = req.body.parseWsck;
+    if (!wskey || !parseWsck) {
         res.status(400).send("Bad Request");
     }
 
-    const envs = await ql.getEnvs();
-    return oneWskeyToCk(id, envs);
+    // 5. 检测状态
+    let crons = await ql.getCrons('ws', '');
+    console.log('获取到wskey本地转换', crons);
+
+    const findItem = crons.find(e => e.name == 'wskey本地转换');
+    const status = findItem.status; // 0 正在运行
+    // 6. 运行任务
+    if (status == 0) {
+        res.status(500).send({ msg: '上一个任务正在运行' });
+        return;
+    }
+
+    //1 先获取所有的环境变量
+    const envs = await ql.getEnvs('');
+    console.log('先获取所有的环境变量', envs);
+    if (envs && envs.length > 0) {
+        //2. 找出JD_WSCK的所有环境变量
+        let ids = envs.filter(e => e.name == 'JD_WSCK' || e.name == 'JD_COOKIE').map(x => x.id);
+        //3. 删除上述环境变量
+        await ql.deleteEnvs(ids);
+    }
+    // 4. 新建环境变量
+    const envsToAdd = [
+        { name: "JD_WSCK", value: wskey, remarks: "TEST" }
+    ];
+    await ql.addEnvs(envsToAdd);
+
+    // 6. 运行任务
+    await ql.runCrons([findItem.id]);
+
+    // 7. 获取任务日志
+    let result = false;
+    for (var i = 0; i < 30; i++) {
+        await waitTime(100);
+        const logText = await ql.getCronLog(findItem.id);
+        console.log("wskeyToCk log: " + logText);
+        if (logText.indexOf('转换成功') > 0) {
+            await waitTime(500);
+            result = true;
+            break;
+        } else if (logText.indexOf('转换失败') > 0) {
+            result = false;
+            break;
+        } else {
+            console.log('尝试 ' + i + " 次");
+            await waitTime(1000);
+        }
+    }
+    // 8. 转换成功获取ck
+    if (result) {
+        //1 先获取所有的环境变量
+        let cks;
+        for (var i = 0; i < 30; i++) {
+            cks = await ql.getEnvs('JD_COOKIE');
+            if (!cks || cks.length == 0) {
+                await waitTime(100);
+            } else {
+                break;
+            }
+        }
+
+        if (!cks || cks.length == 0) {
+            res.status(500).send({ msg: '没有获取到ck' });
+            return;
+        }
+
+        //2. 找出 JD_COOKIE 的所有环境变量
+        console.log("cks", cks);
+
+        let ck = cks[0];
+        let ckvalue = ck.value;
+        const parts = ckvalue.split(';');
+        const objectArray = [];
+
+        parts.forEach(part => {
+            const pair = part.split('=');
+            if (pair.length === 2) {
+                const name = pair[0].trim();
+                const value = pair[1].trim();
+
+                // 构建对象
+                const obj = {
+                    name: name,
+                    value: value,
+                    domain: ".jd.com",
+                    path: "/",
+                    expires: 1722385590,
+                    httpOnly: false,
+                    secure: false,
+                    session: false,
+                    sameParty: false
+                };
+
+                // 添加到数组
+                objectArray.push(obj);
+            }
+        });
+
+        let parseWsckEnv = await ql.getEnvs(parseWsck);
+        if (parseWsckEnv || parseWsckEnv.length > 0) {
+            let wsArr = JSON.parse(parseWsckEnv[0].value);
+            wsArr.forEach(x => {
+                if (x.name == wskey) {
+                    x.parseCk = JSON.stringify(objectArray);
+                }
+            })
+            const envsToUp = { id: parseWsckEnv[0].id, name: parseWsck, value: JSON.stringify(wsArr) };
+            await ql.updateEnv(envsToUp);
+            res.status(200).send({ data: objectArray });
+            return;
+        } else {
+            res.status(500).send({ msg: '没有找到环境变量' + parseWsckEnv });
+        }
+    } else {
+        let parseWsckEnv = await ql.getEnvs(parseWsck);
+        if (parseWsckEnv || parseWsckEnv.length > 0) {
+            let wsArr = JSON.parse(parseWsckEnv[0].value);
+            wsArr.forEach(x => {
+                if (x.name == wskey) {
+                    x.parseCk = JSON.stringify({ msg: '转换失败' });
+                }
+            })
+            const envsToUp = { id: parseWsckEnv[0].id, name: parseWsck, value: JSON.stringify(wsArr) };
+            await ql.updateEnv(envsToUp);
+        }
+        await ql.stopCrons([findItem.id])
+        res.status(500).send({ msg: '转换失败' });
+        return;
+    }
 }
 
 async function getCornTaskAndLog2(type, res) {
@@ -529,41 +740,31 @@ async function getCornTaskAndLog2(type, res) {
         res.status(400).send("Bad Request");
         return;
     }
-    let queryString = '{"filters":null,"sorts":null,"filterRelation":"and"}';
-    let searchValue = '';
 
+    let searchValue = '';
     let queryObj = { filters: null, sorts: null, filterRelation: "and" }
 
-    if (type == 'other') {
-        // 不包含农场 dapai 真正运行 0 
-        // 1 空闲 2 已禁用
-        queryString = '{"filters":[{"property":"name","operation":"NotReg","value":"农场"},{"property":"name","operation":"NotReg","value":"大牌"},{"property":"status","operation":"Nin","value":[0]}],"sorts":null,"filterRelation":"and"}';
-    } else if (type == 'top') {
+    if (type == 'top') {
         let filtersArr = [
             { "property": "isPinned", "operation": "Reg", "value": "1" },
         ]
         queryObj.filters = filtersArr;
-        queryString = JSON.stringify(queryObj);
-
-
     } else if (type == 'today') {
         let filtersArr = [
             { "property": "isDisabled", "operation": "Reg", "value": "0" },
         ]
         queryObj.filters = filtersArr;
-        queryString = JSON.stringify(queryObj);
     } else if (type == 'todayOnce') {
         let filtersArr = [
             { "property": "isDisabled", "operation": "Reg", "value": "0" },
         ]
         queryObj.filters = filtersArr;
-        queryString = JSON.stringify(queryObj);
     }
 
     console.time('executionTime');
     //条件查询出的结果
-    let envs = await ql.getCrons(searchValue, queryString);
-    // console.log(envs.length);
+    let envs = await ql.getCrons(searchValue, JSON.stringify(queryObj));
+    // console.log(envs);
 
     const daystart = new Date();
     daystart.setHours(0, 0, 0, 0)
@@ -584,20 +785,22 @@ async function getCornTaskAndLog2(type, res) {
     }
 
     //按上次执行时间 从大到小排序
-    envs.sort((a, b) => {
-        // 正在运行的排前面
-        if (a.status !== b.status) {
-            return a.status - b.status;
-        }
-        // 如果 status 相同，则根据 last_execution_time 排序
-        if (type == 'todayOnce') {
-            return a.last_execution_time - b.last_execution_time;
-        } else if (type == 'future') {
-            return a.nextExeTime - b.nextExeTime;
-        } else {
-            return b.last_execution_time - a.last_execution_time;
-        }
-    });
+    if (envs && envs.length > 0) {
+        envs.sort((a, b) => {
+            // 正在运行的排前面
+            if (a.status !== b.status) {
+                return a.status - b.status;
+            }
+            // 如果 status 相同，则根据 last_execution_time 排序
+            if (type == 'todayOnce') {
+                return a.last_execution_time - b.last_execution_time;
+            } else if (type == 'future') {
+                return a.nextExeTime - b.nextExeTime;
+            } else {
+                return b.last_execution_time - a.last_execution_time;
+            }
+        });
+    }
 
     let length = envs.length;
     for (let i = 0; i < length; i++) {
@@ -771,25 +974,104 @@ function getFiltedLog(logText) {
 
 async function getTypeEnv(req, res, next) {
     let type = req.body.type;
-    let envs = await ql.getEnvs();
+    let envs = [];
     if (type && type.toLowerCase() !== 'all') {
-        envs = envs.filter(e => type == e.name);
+        envs = await ql.getEnvs(type);
     } else {
+        envs = await ql.getEnvs();
         envs = envs.filter(e => e.name != 'JD_WSCK' && e.name != 'JD_COOKIE');
     }
     // console.log(envs.length);
-
-    envs.sort((a, b) => {
-        // 被禁用的排前面
-        if (a.status !== b.status) {
-            return b.status - a.status;
-        } else {
-            //timestamp更新新值的时间，updatedAt是任何变动的更新时间
-            return formatDateString(a.timestamp) > formatDateString(b.timestamp) ? 1 : -1;
-        }
-    });
-
+    if (envs && envs.length > 0) {
+        envs.sort((a, b) => {
+            // 被禁用的排前面
+            if (a.status !== b.status) {
+                return b.status - a.status;
+            } else {
+                //timestamp更新新值的时间，updatedAt是任何变动的更新时间
+                return formatDateString(a.timestamp) > formatDateString(b.timestamp) ? 1 : -1;
+            }
+        });
+    }
     res.json(envs);
+}
+
+async function addEnvs(req, res, next) {
+    let value = req.body.value;
+    let name = req.body.name;
+    let remarks = req.body.remarks;
+    const envsToAdd = [
+        { name: name, value: value, remarks: remarks }
+    ];
+    await ql.addEnvs(envsToAdd);
+    res.json({ code: 0 });
+}
+
+async function parseWsck(req, res, next) {
+    let text = req.body.text;
+    let name = req.body.name;
+    let remarks = req.body.remarks;
+    // 提取pin和wskey并存入数组
+    const array = [];
+    const regex = /pin=(jd_\w+);wskey=([\w-]+);/g;
+    let match = null;
+    let index = 0;
+    while ((match = regex.exec(text)) !== null) {
+        let obj = {};
+        obj["id"] = ++index;
+        obj["name"] = `pin=${match[1]};wskey=${match[2]};`;
+        obj["parseCk"] = null;
+        obj["parseTime"] = null;
+        array.push(obj);
+    }
+    // console.log(array);
+
+    let find = await ql.getEnvs(name);
+    console.log('是否存在 ', find);
+    if (find && find.length > 0) {
+        // 更新一条
+        const envsToUp = { id: find[0].id, name: name, value: JSON.stringify(array), remarks: remarks };
+        await ql.updateEnv(envsToUp);
+    } else {
+        const envsToAdd = [
+            { name: name, value: JSON.stringify(array), remarks: remarks }
+        ];
+        await ql.addEnvs(envsToAdd);
+    }
+    res.json({ code: 0, data: array });
+}
+
+// 直接解析wskey到环境变量
+async function parseWsck2(req, res, next) {
+    let text = req.body.text;
+    let name = req.body.name;
+    let remarks = req.body.remarks;
+
+    if (!text || !name || !remarks) {
+        res.status(400).send("Bad Request");
+        return;
+    }
+    // 获取所有环境变量
+    let all = await ql.getEnvs();
+    if (all && all.length > 0) {
+        //2. 找出JD_WSCK的所有环境变量
+        let ids = all.filter(e => e.name == 'JD_WSCK' || e.name == 'JD_COOKIE').map(x => x.id);
+        //3. 删除上述环境变量
+        await ql.deleteEnvs(ids);
+    }
+
+    // 提取pin和wskey并存入数组
+    const regex = /pin=(jd_\w+);wskey=([\w-]+);/g;
+    let match = null;
+    while ((match = regex.exec(text)) !== null) {
+        const envsToAdd = [
+            { name: "JD_WSCK", value: `pin=${match[1]};wskey=${match[2]};`, remarks: 'auto parse' }
+        ];
+        await ql.addEnvs(envsToAdd);
+    }
+    let find = await ql.getEnvs("JD_WSCK");
+    let filterArr = find.filter(x => x.remarks == 'auto parse');
+    res.json({ code: 0, data: filterArr });
 }
 
 //utils

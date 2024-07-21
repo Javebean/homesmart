@@ -1,17 +1,20 @@
 <template>
   <div class="page">
     <a-radio-group v-model:value="activeKey" @change="tab1change">
-      <a-radio-button value="JD_COOKIE">CK({{ enableCkNums }})</a-radio-button>
-      <a-radio-button value="JD_WSCK">WSKEY（{{ enableWsNums }}）</a-radio-button>
+      <a-radio-button value="JD_COOKIE">CK{{ enableCkNums }}</a-radio-button>
+      <a-radio-button value="JD_WSCK">WSKEY{{ enableWsNums }}</a-radio-button>
       <a-radio-button value="ALL">其他</a-radio-button>
     </a-radio-group>
 
     <a-flex :justify="justify" :align="alignItems" wrap="wrap">
       <a-button @click="disableAllByType">禁用本页</a-button>
       <a-button @click="enableAllByType">启用本页</a-button>
-      <a-button v-show="activeKey == 'JD_COOKIE'" @click="startStopCrons(372)">ck检测</a-button>
-      <a-button v-show="activeKey == 'JD_COOKIE'" @click="getLatestTaskLog(372)">ck日志</a-button>
-      <a-button v-show="activeKey != 'JD_COOKIE'" @click="getLatestTaskLog(436)">wskey日志</a-button>
+      <a-button v-show="activeKey == 'JD_COOKIE' && ckCheckTaskId > 0"
+        @click="startStopCrons(ckCheckTaskId)">ck检测</a-button>
+      <a-button v-show="activeKey == 'JD_COOKIE' && ckCheckTaskId > 0"
+        @click="getLatestTaskLog(ckCheckTaskId)">ck检测日志</a-button>
+      <a-button v-show="activeKey != 'JD_COOKIE' && wsKeyTaskId > 0"
+        @click="getLatestTaskLog(wsKeyTaskId)">wskey日志</a-button>
     </a-flex>
 
     <div class="ws-log">
@@ -63,17 +66,40 @@ const justify = "space-between";
 const alignItems = "center";
 // 初始tab值
 const activeKey = ref('JD_COOKIE');
-const enableCkNums = ref(0);
-const enableWsNums = ref(0);
+const enableCkNums = ref('');
+const enableWsNums = ref('');
 const wslog = ref('');
+const ckCheckTaskId = ref(0);
+const wsKeyTaskId = ref(0);
 
 onMounted(() => {
+  getInitInfo()
   getQlEnvsByName(activeKey.value)
 })
 
 // 定义一个 ref 来存储服务器返回的数据
 const items = ref([]);
-// 根据名称获取环境变量
+// 获取初始化数据
+function getInitInfo() {
+  proxy.$api.QL.getInitInfo({ type: name }).then((response: any) => {
+    const data = response.data
+    console.log(data);
+    if (data.data && data.data.length > 0) {
+      data.data.forEach((x: any) => {
+        if (x.name.indexOf('检测') > -1) {
+          ckCheckTaskId.value = x.id;
+        } else if (x.name.indexOf('本地') > -1) {
+          wsKeyTaskId.value = x.id;
+        } else if (x.name.indexOf('转换') > -1) {
+          wsKeyTaskId.value = x.id;
+        }
+      })
+    }
+  }).catch(function (error: any) {
+    console.log(error);
+  });
+}
+
 function getQlEnvsByName(name: string) {
   proxy.$api.QL.getQlEnvsByName({ type: name }).then((response: any) => {
     const data = response.data
@@ -82,9 +108,9 @@ function getQlEnvsByName(name: string) {
       item.loading = false;
     });
     if (name == 'JD_COOKIE') {
-      enableCkNums.value = data.filter((item: any) => item.status == 0).length;
+      enableCkNums.value = '（' + data.filter((item: any) => item.status == 0).length + '/' + data.length + '）';
     } else if (name == "JD_WSCK") {
-      enableWsNums.value = data.filter((item: any) => item.status == 0).length;
+      enableWsNums.value = '（' + data.filter((item: any) => item.status == 0).length + '/' + data.length + '）';
     }
     items.value = data;
   }).catch(function (error: any) {

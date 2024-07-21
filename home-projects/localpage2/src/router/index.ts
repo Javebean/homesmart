@@ -14,7 +14,17 @@ const routes: Array<RouteRecordRaw> = [
     // this generates a separate chunk (about.[hash].js) for this route
     // which is lazy-loaded when the route is visited.
     component: () => import(/* webpackChunkName: "about" */ '../views/TaskView.vue')
-  }
+  },
+  {
+    path: '/wskey',
+    name: 'wskey',
+    component: () => import(/* webpackChunkName: "about" */ '../views/Wskey.vue')
+  },
+  {
+    path: '/backupenv',
+    name: 'backupenv',
+    component: () => import(/* webpackChunkName: "about" */ '../views/BackUpEnv.vue')
+  },
 ]
 
 const router = createRouter({

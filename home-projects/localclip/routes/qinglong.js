@@ -14,6 +14,24 @@ const ql = require('../services/qlService');
 //     }
 // });
 
+router.use('/addEnvs', async (req, res) => {
+    try {
+        await ql.addEnvs(req, res);
+    } catch (error) {
+        console.log(error);
+        res.status(500).send('Failed to get environment variables');
+    }
+});
+
+//把文本转换为wsck对象数组，放入指定环境变量
+router.use('/parseWsck', async (req, res) => {
+    try {
+        await ql.parseWsck(req, res);
+    } catch (error) {
+        console.log(error);
+        res.status(500).send('Failed to get environment variables');
+    }
+});
 
 router.use('/getEnvs', async (req, res) => {
     try {
@@ -91,15 +109,7 @@ router.use('/enableEnvByName', async (req, res) => {
 
 router.use('/specifiedWskeyToCk', async (req, res) => {
     try {
-        let id = req.body.id;
-        let pageIds = req.body.pageIds;
-
-        let obj = await ql.specifiedWskeyToCk(id, pageIds);
-        if (obj.result) {
-            res.json({ id: id, ...obj });
-        } else {
-            res.status(500).send('Failed to get environment variables1');
-        }
+        let obj = await ql.specifiedWskeyToCk(req, res);
     } catch (error) {
         console.log(error);
         res.status(500).send('Failed to get environment variables');
@@ -178,6 +188,33 @@ router.use('/getCornTaskAndLog2', async (req, res) => {
     } catch (error) {
         console.log(error);
         res.status(500).send('Failed to get environment variables');
+    }
+});
+
+router.use('/getInitInfo', async (req, res) => {
+    try {
+        return await ql.getInitInfo(req, res);
+    } catch (error) {
+        console.log(error);
+        res.status(500).send('Failed to backupEnv');
+    }
+});
+
+router.use('/backupEnv', async (req, res) => {
+    try {
+        return await ql.backupEnv(req, res);
+    } catch (error) {
+        console.log(error);
+        res.status(500).send('Failed to backupEnv');
+    }
+});
+
+router.use('/getBackupEnvList', async (req, res) => {
+    try {
+        return await ql.getBackupEnvList(req, res);
+    } catch (error) {
+        console.log(error);
+        res.status(500).send('Failed getBackupEnvList');
     }
 });
 

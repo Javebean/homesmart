@@ -113,3 +113,49 @@ export function startStopCrons(data = {}) {
         data
     })
 }
+export function addEnvs(data = {}) {
+    return request({
+        method: 'POST',
+        url: '/ql/addEnvs',
+        data
+    })
+}
+export function parseWsck(data = {}) {
+    return request({
+        method: 'POST',
+        url: '/ql/parseWsck',
+        data
+    })
+}
+
+export function specifiedWskeyToCk(data = {}) {
+    return request({
+        method: 'POST',
+        url: '/ql/specifiedWskeyToCk',
+        data
+    })
+}
+
+export function getInitInfo(data = {}) {
+    return request({
+        method: 'POST',
+        url: '/ql/getInitInfo',
+        data
+    })
+}
+
+export function getBackupEnvList(data = {}) {
+    return request({
+        method: 'POST',
+        url: '/ql/getBackupEnvList',
+        data
+    })
+}
+
+export function backupEnv(data = {}) {
+    return request({
+        method: 'POST',
+        url: '/ql/backupEnv',
+        data
+    })
+}

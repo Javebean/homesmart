@@ -1,7 +1,9 @@
 <template>
   <nav>
     <router-link to="/env">环境变量</router-link> |
-    <router-link to="/task">任务</router-link>
+    <router-link to="/task">任务</router-link> |
+    <router-link to="/wskey">wskey</router-link> |
+    <router-link to="/backupenv">备份环境变量</router-link>
   </nav>
   <StyleProvider hash-priority="high" :transformers="[legacyLogicalPropertiesTransformer]">
     <router-view />
