@@ -1,7 +1,0 @@
-node_modules
-npm-debug.log
-.DS_Store
-.git
-testdockerignore
-data/upload
-public/vue/js/*.js.map
