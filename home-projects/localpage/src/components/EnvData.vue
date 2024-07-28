@@ -6,21 +6,42 @@
       <a-radio-button value="ALL">其他</a-radio-button>
     </a-radio-group>
 
-    <a-flex :justify="justify" :align="alignItems" wrap="wrap">
-      <a-button @click="disableAllByType">禁用本页</a-button>
-      <a-button @click="enableAllByType">启用本页</a-button>
+    <a-flex :justify="justify" :align="alignItems">
+      <!-- <a-button @click="disableAllByType">禁用本页</a-button>
+      <a-button @click="enableAllByType">启用本页</a-button> -->
       <a-button v-show="activeKey == 'JD_COOKIE' && ckCheckTaskId > 0"
         @click="startStopCrons(ckCheckTaskId)">ck检测</a-button>
       <a-button v-show="activeKey == 'JD_COOKIE' && ckCheckTaskId > 0"
         @click="getLatestTaskLog(ckCheckTaskId)">ck检测日志</a-button>
       <a-button v-show="activeKey != 'JD_COOKIE' && wsKeyTaskId > 0"
         @click="getLatestTaskLog(wsKeyTaskId)">wskey日志</a-button>
+
+      <a-dropdown-button @click="showAddEnvTextare = !showAddEnvTextare">
+        新建变量
+        <template #overlay>
+          <a-menu>
+            <a-menu-item key="1" @click="disableAllByType">
+              禁用本页
+            </a-menu-item>
+            <a-menu-item key="2" @click="enableAllByType">
+              启用本页
+            </a-menu-item>
+          </a-menu>
+        </template>
+      </a-dropdown-button>
+
     </a-flex>
 
     <div class="ws-log">
       {{ wslog }}
     </div>
 
+    <a-card v-show="showAddEnvTextare" :bodyStyle="{ padding: '10px' }" style="width: 100%">
+      <a-textarea v-model:value="newEnvValue" placeholder="请使用“空格” “,” “=” “#” 分隔键值对" />
+      <a-flex :justify="justify" :align="alignItems">
+        <a-button style="margin-top: 10px;" type="primary" @click="addNewEnv">保存</a-button>
+      </a-flex>
+    </a-card>
     <div class="data-item" v-for="env in items" :key="env.id">
       <a-card :bodyStyle="{ padding: '10px' }" style="width: 100%">
         <a-textarea :disabled="env.disabled" v-model:value="env.value"
@@ -28,7 +49,7 @@
           :autoSize="env.value ? true : { minRows: 6, maxRows: 8 }" />
 
         <a-flex class="status-info" :justify="justify" :align="alignItems" wrap="wrap">
-          <div>备注： {{ env.remarks }}</div>
+          <div>备注： {{ env.remarks ? env.remarks : '暂无' }}</div>
           <div>变量名：{{ env.name }}</div>
           <div>状态：<a-badge :color="env.status === 0 ? 'green' : 'red'" />{{ env.status === 0 ? "启用中" : "禁用中" }}</div>
           <div>时长：{{ getTimeDifference(env.timestamp) }} </div>
@@ -36,10 +57,29 @@
         </a-flex>
         <a-flex :justify="justify" :align="alignItems">
           <a-button type="primary" @click="toggleQlEnvStatus(env.id)">{{ env.status === 0 ? "禁用" : "启用" }}</a-button>
-          <a-button type="primary" v-show="env.name == 'JD_COOKIE'" @click="disableOtherCk(env.id)">禁用其他CK</a-button>
-          <a-button type="primary" v-show="env.disabled" @click="updateQlEnv(env.id)">编辑</a-button>
-          <a-button type="primary" :loading="env.loading" v-show="!env.disabled"
-            @click="saveQlEnv(env.id)">保存</a-button>
+          <!-- <a-button type="primary" v-show="env.name == 'JD_COOKIE'" @click="disableOtherCk(env.id)">禁用其他CK</a-button> -->
+          <!-- <a-button type="primary" v-show="env.disabled" @click="editEnv(env.id)">更新</a-button> -->
+          <!-- <a-button type="primary" :loading="env.loading" v-show="!env.disabled"
+            @click="updateEnv(env.id)">保存</a-button> -->
+
+          <a-dropdown-button>
+            <span @click="editEnv(env.id)" v-show="env.disabled">更新</span>
+            <span @click="updateEnv(env.id)" v-show="!env.disabled">保存</span>
+            <template #overlay>
+              <a-menu>
+                <a-menu-item key="1" @click="env.disabled = false;">
+                  编辑旧值
+                </a-menu-item>
+                <a-menu-item key="2" v-if="env.name == 'JD_COOKIE'" @click="disableOtherCk(env.id)">
+                  禁用其他CK
+                </a-menu-item>
+                <a-menu-item key="3" @click="delEnv(env.id)">
+                  删除
+                </a-menu-item>
+              </a-menu>
+            </template>
+          </a-dropdown-button>
+
         </a-flex>
       </a-card>
     </div>
@@ -48,9 +88,9 @@
 </template>
 
 <script lang="ts" setup>
-import { ref, getCurrentInstance, onMounted } from 'vue';
+import { ref, getCurrentInstance, onMounted, computed } from 'vue';
 // import { MailOutlined, AppstoreOutlined, SettingOutlined } from '@ant-design/icons-vue';
-import { message, RadioButton as ARadioButton, RadioGroup as ARadioGroup, Flex as AFlex, Textarea as ATextarea, Button as AButton, Badge as ABadge, Card as ACard } from 'ant-design-vue';
+import { DropdownButton as ADropdownButton, Menu as AMenu, MenuItem as AMenuItem, message, RadioButton as ARadioButton, RadioGroup as ARadioGroup, Flex as AFlex, Textarea as ATextarea, Button as AButton, Badge as ABadge, Card as ACard } from 'ant-design-vue';
 // import { message, Flex as AFlex} from 'ant-design-vue';
 //F1 -> reload window helped me
 // import { MenuProps } from 'ant-design-vue';
@@ -59,6 +99,43 @@ import { message, RadioButton as ARadioButton, RadioGroup as ARadioGroup, Flex a
 // https://juejin.cn/post/7358639538501419059
 const [messageApi, contextHolder] = message.useMessage();
 
+const successMsg = function (msg: string) {
+  messageApi.success({
+    content: () => msg,
+    class: 'custom-class',
+    style: {
+      marginTop: '300px',
+    },
+  });
+}
+const warningMsg = function (msg: string) {
+  messageApi.warning({
+    content: () => msg,
+    class: 'custom-class',
+    style: {
+      marginTop: '300px',
+    },
+  });
+}
+const errorMsg = function (msg: string) {
+  messageApi.error({
+    content: () => msg,
+    class: 'custom-class',
+    style: {
+      marginTop: '300px',
+    },
+  });
+}
+const infoMsg = function (msg: string) {
+  messageApi.info({
+    content: () => msg,
+    class: 'custom-class',
+    style: {
+      marginTop: '300px',
+    },
+  });
+}
+
 // ts proxy 使用
 const { proxy }: any = getCurrentInstance()
 
@@ -66,11 +143,11 @@ const justify = "space-between";
 const alignItems = "center";
 // 初始tab值
 const activeKey = ref('JD_COOKIE');
-const enableCkNums = ref('');
-const enableWsNums = ref('');
 const wslog = ref('');
+const newEnvValue = ref('');
 const ckCheckTaskId = ref(0);
 const wsKeyTaskId = ref(0);
+const showAddEnvTextare = ref(false);
 
 onMounted(() => {
   getInitInfo()
@@ -107,16 +184,34 @@ function getQlEnvsByName(name: string) {
       item.disabled = true;
       item.loading = false;
     });
-    if (name == 'JD_COOKIE') {
-      enableCkNums.value = '（' + data.filter((item: any) => item.status == 0).length + '/' + data.length + '）';
-    } else if (name == "JD_WSCK") {
-      enableWsNums.value = '（' + data.filter((item: any) => item.status == 0).length + '/' + data.length + '）';
-    }
     items.value = data;
   }).catch(function (error: any) {
     console.log(error);
   });
 }
+
+// 保存上一次的值
+let temp = '';
+const enableCkNums = computed(() => {
+  console.log(activeKey.value);
+  if (activeKey.value == 'JD_COOKIE') {
+    const enabledCount = items.value.filter(o => o.status === 0).length;
+    temp = `(${enabledCount}/${items.value.length})`
+    return `(${enabledCount}/${items.value.length})`;
+  } else {
+    return temp;
+  }
+});
+
+const enableWsNums = computed(() => {
+  if (activeKey.value == 'JD_WSCK') {
+    const enabledCount = items.value.filter(o => o.status === 0).length;
+    temp = `(${enabledCount}/${items.value.length})`
+    return `(${enabledCount}/${items.value.length})`;
+  } else {
+    return temp;
+  }
+});
 
 // 启用禁用切换按钮
 function toggleQlEnvStatus(id: number) {
@@ -132,26 +227,54 @@ function toggleQlEnvStatus(id: number) {
 }
 
 // 编辑
-function updateQlEnv(id: number) {
+function editEnv(id: number) {
   const itemToUpdate = items.value.find(item => item.id === id);
   itemToUpdate.value0 = itemToUpdate.value;
   itemToUpdate.value = "";
   itemToUpdate.disabled = false;
 }
 
-//保存
-function saveQlEnv(id: number) {
+function addNewEnv() {
+  let value = newEnvValue.value;
+  const result = value.split(/[,\s#=]+/).filter(Boolean);;
+  console.log('addNewEnv', result, result.length);
+  if (result.length > 1) {
+    proxy.$api.QL.addEnvs({ name: result[0], value: result[1], remarks: result[2] || '' }).then((response: any) => {
+      console.log(response);
+      successMsg(response.data.msg);
+      showAddEnvTextare.value = false;
+    }).catch(function (error: any) {
+      console.log(error.response.data);
+      errorMsg(error.response.data.msg)
+    }).finally(() => {
+      errorMsg('保存失败');
+    })
+  } else {
+    warningMsg("变量格式不正确，请检查。")
+  }
+}
+
+function delEnv(id: number) {
+  proxy.$api.QL.delEnvs({ delIds: [id] }).then((response: any) => {
+    const index = items.value.findIndex(item => item.id === id);
+    if (index !== -1) {
+      items.value.splice(index, 1);
+    }
+    successMsg(response.data.msg);
+  }).catch(function (error: any) {
+    console.log(error.response.data);
+    errorMsg(error.response.data.msg)
+  }).finally(() => {
+    errorMsg('删除失败');
+  })
+}
+
+//更新
+function updateEnv(id: number) {
   const itemToUpdate = items.value.find(item => item.id === id);
   if (!itemToUpdate.value) {
     itemToUpdate.value = itemToUpdate.value0;
-    // message.info('无更新');
-    messageApi.info({
-      content: () => '无更新',
-      class: 'custom-class',
-      style: {
-        marginTop: '300px',
-      },
-    });
+    infoMsg('无更新');
     window.scrollTo({ top: 0, behavior: 'auto' });
     itemToUpdate.disabled = true;
   } else {
@@ -167,24 +290,11 @@ function saveQlEnv(id: number) {
       const newArr = items.value.filter(item => item.id != id);
       newArr.push(itemToUpdate);
       items.value = newArr;
-
       console.log(data);
-      messageApi.success({
-        content: () => data.msg,
-        class: 'custom-class',
-        style: {
-          marginTop: '300px',
-        },
-      });
+      successMsg(data.msg)
     }).catch(function (error: any) {
       console.log(error.response.data);
-      messageApi.error({
-        content: () => error.response.data.msg,
-        class: 'custom-class',
-        style: {
-          marginTop: '300px',
-        },
-      });
+      errorMsg(error.response.data.msg)
     }).finally(() => {
       itemToUpdate.loading = false;
       itemToUpdate.disabled = true;
@@ -205,13 +315,7 @@ function disableOtherCk(id: number) {
       }
     });
     // message.success('禁用成功');
-    messageApi.success({
-      content: () => '禁用成功',
-      class: 'custom-class',
-      style: {
-        marginTop: '300px',
-      },
-    });
+    successMsg('禁用成功')
   }).catch(function (error: any) {
     console.log(error);
   });
@@ -226,7 +330,7 @@ function tab1change() {
   wslog.value = '';
 }
 
-// 启用本页
+// 禁用本页
 function disableAllByType() {
   proxy.$api.QL.disableEnvByName({ name: activeKey.value }).then((response: any) => {
     items.value.forEach((item: any) => {
@@ -237,7 +341,7 @@ function disableAllByType() {
   });
 }
 
-// 禁用本页
+// 启用本页
 function enableAllByType() {
   proxy.$api.QL.enableEnvByName({ name: activeKey.value }).then((response: any) => {
     items.value.forEach((item: any) => {
@@ -266,14 +370,7 @@ function getLatestTaskLog(id: number) {
   proxy.$api.QL.getLatestLogById({ id: id }).then((response: any) => {
     wslog.value = response.data.log;
   }).catch(function (error: any) {
-    // console.log(error.response.data.msg);
-    messageApi.error({
-      content: () => '获取日志失败',
-      class: 'custom-class',
-      style: {
-        marginTop: '300px',
-      },
-    });
+    errorMsg('获取日志失败')
   }).finally(() => {
   });
 }
@@ -281,22 +378,10 @@ function getLatestTaskLog(id: number) {
 function startStopCrons(id: number) {
   proxy.$api.QL.startStopCrons({ id: id }).then((response: any) => {
     const data = response.data
-    messageApi.success({
-      content: () => data.msg,
-      class: 'custom-class',
-      style: {
-        marginTop: '300px',
-      },
-    });
+    successMsg(data.msg);
   }).catch(function (error: any) {
     console.log(error.response.data.msg);
-    messageApi.error({
-      content: () => error.response.data.msg,
-      class: 'custom-class',
-      style: {
-        marginTop: '300px',
-      },
-    });
+    errorMsg(error.response.data.msg)
   }).finally(() => {
   });
 }
@@ -343,23 +428,14 @@ function getTimeDifference(dateString: string) {
     // 计算相差的分钟数（去掉天数和小时数后的剩余部分）
     const minutesDiff: number = Math.floor((timeDifference % (1000 * 60 * 60)) / (1000 * 60));
 
-    console.log(`与给定时间 "${givenTimeStr}" 相差: ${daysDiff} 天 ${hoursDiff} 小时 ${minutesDiff} 分钟`);
+    // console.log(`与给定时间 "${givenTimeStr}" 相差: ${daysDiff} 天 ${hoursDiff} 小时 ${minutesDiff} 分钟`);
 
-    return (daysDiff > 0 ? daysDiff + '天' : '') + (hoursDiff > 0 ? hoursDiff + '小时' : '') + (minutesDiff > 0 ? minutesDiff + '分钟' : '')
+    return (daysDiff > 0 ? daysDiff + '天' : '') + (hoursDiff > 0 ? hoursDiff + '小时' : '') + ((minutesDiff || '0') + '分钟')
 
   } catch (error) {
     console.log(error);
     alert(`错误: ${error instanceof Error ? error.message : error}`);
   }
-
-
-
-
-
-
-
-
-
 
   // dateString = formatDateString(dateString);
 

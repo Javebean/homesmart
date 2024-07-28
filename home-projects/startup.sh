@@ -1,1 +1,0 @@
-cd ./localserve && pnpm run dev && cd ../localpage && pnpm run serve

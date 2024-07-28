@@ -23,6 +23,15 @@ router.use('/addEnvs', async (req, res) => {
     }
 });
 
+router.use('/delEnvs', async (req, res) => {
+    try {
+        await ql.delEnvs(req, res);
+    } catch (error) {
+        console.log(error);
+        res.status(500).send('Failed to get environment variables');
+    }
+});
+
 //把文本转换为wsck对象数组，放入指定环境变量
 router.use('/parseWsck', async (req, res) => {
     try {

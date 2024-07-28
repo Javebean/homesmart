@@ -5,7 +5,7 @@
   "scripts": {
     "serve": "vue-cli-service serve",
     "build": "vue-cli-service build",
-    "build-dest": "vue-cli-service build --dest=../localclip/public/vue"
+    "build-dest": "vue-cli-service build --dest=../localserve/public/vue"
   },
   "dependencies": {
     "ant-design-vue": "4.x",

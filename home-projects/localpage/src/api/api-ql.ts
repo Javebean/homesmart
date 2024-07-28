@@ -129,6 +129,15 @@ export function addEnvs(data = {}) {
         data
     })
 }
+
+export function delEnvs(data = {}) {
+    return request({
+        method: 'POST',
+        url: '/ql/delEnvs',
+        data
+    })
+}
+
 export function parseWsck(data = {}) {
     return request({
         method: 'POST',

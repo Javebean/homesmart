@@ -83,16 +83,16 @@ class QL {
             const { data } = response;
             if (data.code === 200) {
                 this.log(`删除环境变量成功：${ids.length}`);
-                return true;
+                return { code: 0, msg: '删除成功' };
             } else {
                 this.log(`删除环境变量失败：${data.message}`);
-                return false;
+                return { code: 1, msg: '删除失败' };
             }
         } catch (error) {
             this.log(`删除环境变量失败1：${error.message}`);
             console.log(error.response.data);
             console.log(error.response.data.validation);
-            return false;
+            return { code: 1, msg: '删除失败' };
         }
     }
 
@@ -104,17 +104,17 @@ class QL {
             const { data } = response;
             if (data.code === 200) {
                 this.log(`新建环境变量成功：${envs.length}`);
-                return true;
+                return { code: 0, msg: '新建成功' };
             } else {
                 this.log(`新建环境变量失败：${data.message}`);
-                return false;
+                return { code: 1, msg: '新建失败' };
             }
         } catch (error) {
             this.log(`已存在键值唯一键: ${error.response.data.message}`);
             console.log(error.response.data.code);
             console.log(error.response.data);
             console.log(error.response.data.validation);
-            return false;
+            return { code: 2, msg: '环境变量已存在' };
         }
     }
 
@@ -348,6 +348,7 @@ module.exports = {
     toggleStatus,
     updateEnvById,
     addEnvs,
+    delEnvs,
     parseWsck,
     parseWsck2,
     getTypeEnv,
@@ -663,7 +664,7 @@ async function enableEnvByName(req, res, next) {
     const disableIds = envs.filter(e => e.name == name && e.status == 1).map(e => e.id);
 
     if (disableIds && disableIds.length > 0) {
-        let status_res = await ql.disableEnvStatus(disableIds);
+        let status_res = await ql.enableEnvStatus(disableIds);
         if (status_res) {
             res.json({ status: status_res });
         }
@@ -1050,23 +1051,34 @@ function getFiltedLog(logText) {
 async function getTypeEnv(req, res, next) {
     let type = req.body.type;
     let envs = [];
-    if (type && type.toLowerCase() !== 'all') {
-        envs = await ql.getEnvs(type);
-    } else {
+    if (type && type.toLowerCase() == 'all') {
         envs = await ql.getEnvs();
         envs = envs.filter(e => e.name != 'JD_WSCK' && e.name != 'JD_COOKIE');
-    }
-    // console.log(envs.length);
-    if (envs && envs.length > 0) {
-        envs.sort((a, b) => {
-            // 被禁用的排前面
-            if (a.status !== b.status) {
-                return b.status - a.status;
-            } else {
-                //timestamp更新新值的时间，updatedAt是任何变动的更新时间
-                return formatDateString(a.timestamp) > formatDateString(b.timestamp) ? 1 : -1;
-            }
-        });
+        if (envs && envs.length > 0) {
+            envs.sort((a, b) => {
+                // 被禁用的排前面
+                if (a.status !== b.status) {
+                    return a.status - b.status;
+                } else {
+                    //timestamp更新新值的时间，updatedAt是任何变动的更新时间
+                    return formatDateString(a.timestamp) > formatDateString(b.timestamp) ? -1 : 1;
+                }
+            });
+        }
+    } else {
+        envs = await ql.getEnvs(type);
+        envs = envs.filter(e => e.name == type);
+        if (envs && envs.length > 0) {
+            envs.sort((a, b) => {
+                // 被禁用的排前面
+                if (a.status !== b.status) {
+                    return b.status - a.status;
+                } else {
+                    //timestamp更新新值的时间，updatedAt是任何变动的更新时间
+                    return formatDateString(a.timestamp) > formatDateString(b.timestamp) ? 1 : -1;
+                }
+            });
+        }
     }
     res.json(envs);
 }
@@ -1078,8 +1090,22 @@ async function addEnvs(req, res, next) {
     const envsToAdd = [
         { name: name, value: value, remarks: remarks }
     ];
-    await ql.addEnvs(envsToAdd);
-    res.json({ code: 0 });
+    let resCode = await ql.addEnvs(envsToAdd);
+    if (resCode.code == 0) {
+        res.json(resCode);
+    } else {
+        res.status(500).json(resCode);
+    }
+}
+
+async function delEnvs(req, res, next) {
+    let delIds = req.body.delIds;
+    let resCode = await ql.deleteEnvs(delIds);
+    if (resCode.code == 0) {
+        res.json(resCode);
+    } else {
+        res.status(500).json(resCode);
+    }
 }
 
 async function parseWsck(req, res, next) {
