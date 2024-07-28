@@ -323,39 +323,77 @@ function formatDateString(dateString: string) {
 }
 
 function getTimeDifference(dateString: string) {
-  dateString = formatDateString(dateString);
+  try {
+    // 获取当前时间
+    const now: Date = new Date();
 
-  // 将日期字符串转换为 Date 对象
-  const givenDate: Date = new Date(dateString);
-  const now: Date = new Date();
+    // 给定的时间
+    const givenTimeStr: string = formatDateString(dateString);;
+    const givenTime: Date = new Date(givenTimeStr.replace(' ', 'T'));
 
-  // 验证日期是否有效
-  if (isNaN(givenDate.getTime())) {
-    throw new Error('Invalid date format');
+    // 计算时间差（毫秒）
+    const timeDifference: number = now.getTime() - givenTime.getTime();
+
+    // 计算相差的天数
+    const daysDiff: number = Math.floor(timeDifference / (1000 * 60 * 60 * 24));
+
+    // 计算相差的小时数（去掉天数后的剩余部分）
+    const hoursDiff: number = Math.floor((timeDifference % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+
+    // 计算相差的分钟数（去掉天数和小时数后的剩余部分）
+    const minutesDiff: number = Math.floor((timeDifference % (1000 * 60 * 60)) / (1000 * 60));
+
+    console.log(`与给定时间 "${givenTimeStr}" 相差: ${daysDiff} 天 ${hoursDiff} 小时 ${minutesDiff} 分钟`);
+
+    return (daysDiff > 0 ? daysDiff + '天' : '') + (hoursDiff > 0 ? hoursDiff + '小时' : '') + (minutesDiff > 0 ? minutesDiff + '分钟' : '')
+
+  } catch (error) {
+    console.log(error);
+    alert(`错误: ${error instanceof Error ? error.message : error}`);
   }
 
-  // 计算时间差（以毫秒为单位）
-  const diffMillis: number = now.getTime() - givenDate.getTime();
 
-  // 将毫秒转换为分钟、小时和天数
-  const millisPerMinute: number = 1000 * 60;
-  const millisPerHour: number = millisPerMinute * 60;
-  const millisPerDay: number = millisPerHour * 24;
 
-  const minutes: number = diffMillis / millisPerMinute;
-  const hours: number = diffMillis / millisPerHour;
-  const days: number = Math.floor(hours / 24);
-  const remainingHours: number = Math.floor(hours % 24);
-  const remainingMinutes: number = Math.floor(minutes % 60);
 
-  // 返回格式化的时间差
-  if (minutes < 60) {
-    return `${Math.floor(minutes)}分钟`;
-  } else if (hours < 24) {
-    return `${Math.floor(hours)}小时${remainingMinutes}分钟`;
-  } else {
-    return `${days}天${remainingHours}小时${remainingMinutes}分钟`;
-  }
+
+
+
+
+
+
+  // dateString = formatDateString(dateString);
+
+  // // 将日期字符串转换为 Date 对象
+  // const givenDate: Date = new Date(dateString);
+  // const now: Date = new Date();
+
+  // // 验证日期是否有效
+  // if (isNaN(givenDate.getTime())) {
+  //   throw new Error('Invalid date format');
+  // }
+
+  // // 计算时间差（以毫秒为单位）
+  // const diffMillis: number = now.getTime() - givenDate.getTime();
+
+  // // 将毫秒转换为分钟、小时和天数
+  // const millisPerMinute: number = 1000 * 60;
+  // const millisPerHour: number = millisPerMinute * 60;
+  // const millisPerDay: number = millisPerHour * 24;
+
+  // const minutes: number = diffMillis / millisPerMinute;
+  // const hours: number = diffMillis / millisPerHour;
+  // const days: number = Math.floor(hours / 24);
+  // const remainingHours: number = Math.floor(hours % 24);
+  // const remainingMinutes: number = Math.floor(minutes % 60);
+
+  // // 返回格式化的时间差
+  // if (minutes < 60) {
+  //   return `${Math.floor(minutes)}分钟`;
+  // } else if (hours < 24) {
+  //   return `${Math.floor(hours)}小时${remainingMinutes}分钟`;
+  // } else {
+  //   return `${days}天${remainingHours}小时${remainingMinutes}分钟`;
+  // }
 }
 </script>
 

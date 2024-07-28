@@ -125,6 +125,15 @@ router.use('/startStopCrons', async (req, res) => {
     }
 });
 
+router.use('/enOrDisableCrons', async (req, res) => {
+    try {
+        return await ql.enOrDisableCrons(req, res);
+    } catch (error) {
+        console.log(error);
+        res.status(500).send('Failed to get environment variables');
+    }
+});
+
 router.use('/getCronsLog', async (req, res) => {
     try {
         let id = req.body.id;

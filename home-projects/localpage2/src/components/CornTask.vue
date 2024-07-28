@@ -26,9 +26,9 @@
         </div>
         <a-flex :justify="justify" :align="alignItems">
           <a-button type="primary" @click=getLatestTaskLog(da.id)>刷新日志</a-button>
-          <!-- 1空闲 0运行中 2禁用 -->
-          <a-button type="primary" @click="startStopCrons(da.id)">{{ da.status == 1 ? '运行' : da.status == 0 ? '停止' :
-      '启用' }}</a-button>
+          <a-button type="primary" @click="enOrDisableCrons(da.id)">{{ da.isDisabled == 1 ? '启用' : '禁用' }}</a-button>
+          <!-- 1空闲 0运行中 -->
+          <a-button type="primary" @click="startStopCrons(da.id)">{{ da.status == 1 ? '运行' : '停止' }}</a-button>
         </a-flex>
       </a-card>
     </div>
@@ -152,6 +152,31 @@ function startStopCrons(id: number) {
     const data = response.data
     let task = dataList.value.find(e => e.id == id);
     task.status = data.status;
+    messageApi.success({
+      content: () => data.msg,
+      class: 'custom-class',
+      style: {
+        marginTop: '300px',
+      },
+    });
+  }).catch(function (error: any) {
+    console.log(error.response.data.msg);
+    messageApi.error({
+      content: () => error.response.data.msg,
+      class: 'custom-class',
+      style: {
+        marginTop: '300px',
+      },
+    });
+  }).finally(() => {
+  });
+}
+
+function enOrDisableCrons(id: number) {
+  proxy.$api.QL.enOrDisableCrons({ id: id }).then((response: any) => {
+    const data = response.data
+    let task = dataList.value.find(e => e.id == id);
+    task.isDisabled = data.isDisabled;
     messageApi.success({
       content: () => data.msg,
       class: 'custom-class',

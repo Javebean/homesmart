@@ -229,22 +229,62 @@ class QL {
         }
     }
 
-    async stopCrons(id) {
+    async stopCrons(idarray) {
         const url = `${this.address}/open/crons/stop`;
         const headers = { Authorization: this.auth };
         try {
-            const response = await axios.put(url, id, { headers });
+            const response = await axios.put(url, idarray, { headers });
             const { data } = response;
             if (data.code === 200) {
                 return true;
             } else {
-                this.log(`禁止失败：${data.message}`);
+                this.log(`停止失败：${data.message}`);
                 return false;
             }
         } catch (error) {
             console.log(error.response.data);
             console.log(error.response.data.validation);
-            this.log(`禁止失败1：${error}`);
+            this.log(`停止失败1：${error}`);
+            return false;
+        }
+    }
+
+    async enableCrons(idarray) {
+        const url = `${this.address}/open/crons/enable`;
+        const headers = { Authorization: this.auth };
+        try {
+            const response = await axios.put(url, idarray, { headers });
+            const { data } = response;
+            if (data.code === 200) {
+                return true;
+            } else {
+                this.log(`启用任务失败：${data.message}`);
+                return false;
+            }
+        } catch (error) {
+            console.log(error.response.data);
+            console.log(error.response.data.validation);
+            this.log(`启用任务失败1：${error}`);
+            return false;
+        }
+    }
+
+    async disableCrons(idarray) {
+        const url = `${this.address}/open/crons/disable`;
+        const headers = { Authorization: this.auth };
+        try {
+            const response = await axios.put(url, idarray, { headers });
+            const { data } = response;
+            if (data.code === 200) {
+                return true;
+            } else {
+                this.log(`禁用任务失败：${data.message}`);
+                return false;
+            }
+        } catch (error) {
+            console.log(error.response.data);
+            console.log(error.response.data.validation);
+            this.log(`禁用任务失败1：${error}`);
             return false;
         }
     }
@@ -315,6 +355,7 @@ module.exports = {
     disableOtherCk,
     disableEnvByName,
     startStopCrons,
+    enOrDisableCrons,
     enableEnvByName,
     getCronsLogById,
     getLatestLogById,
@@ -542,6 +583,40 @@ async function backupEnv(req, res, next) {
         } else {
             console.log('File saved successfully:', filePath);
             res.json({ status: 0, filename });
+        }
+    });
+}
+
+async function restoreEnv(req, res, next) {
+    let filename = req.body.filename;
+    const dataPath = path.join(__dirname, '..', 'data', filename);
+
+    //和最新的对比，如果当前的环境变量没有备份，先备份
+    let envs = await ql.getEnvs();
+
+
+
+    // 读取 JSON 文件
+    fs.readFile(dataPath, 'utf8', (err, data) => {
+        if (err) {
+            console.error('Error reading file:', err);
+            return;
+        }
+        let jsonArray;
+        try {
+            // 解析 JSON 数据
+            jsonArray = JSON.parse(data);
+        } catch (parseErr) {
+            console.error('Error parsing JSON:', parseErr);
+            return;
+        }
+        if (jsonArray) {
+            const envsToAdd = jsonArray.map(x => ({
+                name: x.name,
+                value: x.value,
+                remarks: x.remarks
+            }));
+            ql.addEnvs(envsToAdd);
         }
     });
 }
@@ -1094,6 +1169,7 @@ function formatDateString(dateString) {
     const formattedDate = `${year}-${month}-${day} ${time}`;
     return formattedDate;
 }
+
 async function startStopCrons(req, res, next) {
     let id = req.body.id;
     if (!id) {
@@ -1116,7 +1192,32 @@ async function startStopCrons(req, res, next) {
             return;
         }
     }
-    res.status(500).json({ id: id, msg: '执行脚本失败' });
+    res.status(500).json({ id: id, msg: '没有查询到该脚本' });
+}
+
+async function enOrDisableCrons(req, res, next) {
+    let id = req.body.id;
+    if (!id) {
+        res.status(400).send("Bad Request");
+        return;
+    }
+
+    let searchValue = '';
+    let queryString = '{"filters":[{"property":"id","operation":"In","value":"' + id + '"}],"sorts":null,"filterRelation":"and"}';
+    let tasks = await ql.getCrons(searchValue, queryString);
+
+    if (tasks && tasks.length > 0) {
+        let task = tasks[0];
+        console.log('执行脚本id:' + id + ", 脚本名称：" + task.name);
+        if (task.status == 1 && await ql.enableCrons([id])) {
+            res.status(200).json({ id: id, isDisabled: 0, msg: '启用任务成功' });
+            return;
+        } else if (task.status == 0 && await ql.disableCrons([id])) {
+            res.status(200).json({ id: id, isDisabled: 1, msg: '禁用任务成功' });
+            return;
+        }
+    }
+    res.status(500).json({ id: id, msg: '没有查询到该脚本' });
 }
 
 async function getCronsLogById(id, res, next) {

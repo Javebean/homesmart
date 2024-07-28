@@ -113,6 +113,15 @@ export function startStopCrons(data = {}) {
         data
     })
 }
+
+export function enOrDisableCrons(data = {}) {
+    return request({
+        method: 'POST',
+        url: '/ql/enOrDisableCrons',
+        data
+    })
+}
+
 export function addEnvs(data = {}) {
     return request({
         method: 'POST',
