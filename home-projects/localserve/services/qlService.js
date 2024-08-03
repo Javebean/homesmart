@@ -111,10 +111,20 @@ class QL {
             }
         } catch (error) {
             this.log(`已存在键值唯一键: ${error.response.data.message}`);
-            console.log(error.response.data.code);
-            console.log(error.response.data);
-            console.log(error.response.data.validation);
-            return { code: 2, msg: '环境变量已存在' };
+            // console.log(error.response.data.code);
+            // console.log(error.response.data);
+            let vali = error.response.data.validation;
+            // console.log(vali);
+            let uniqueData = {};
+            if (vali) {
+                uniqueData = vali.map(x => ({ [x.path]: x.value })).reduce((acc, item) => {
+                    const key = Object.keys(item)[0];
+                    acc[key] = item[key];
+                    return acc;
+                }, {});
+                console.log(uniqueData);
+            }
+            return { code: 2, msg: '环境变量已存在', uniqueData };
         }
     }
 
@@ -1084,18 +1094,17 @@ async function getTypeEnv(req, res, next) {
 }
 
 async function addEnvs(req, res, next) {
-    let value = req.body.value;
-    let name = req.body.name;
-    let remarks = req.body.remarks;
-    const envsToAdd = [
-        { name: name, value: value, remarks: remarks }
-    ];
-    let resCode = await ql.addEnvs(envsToAdd);
-    if (resCode.code == 0) {
-        res.json(resCode);
-    } else {
-        res.status(500).json(resCode);
+    console.log(req.body);
+    if (req.body) {
+        let resCode = await ql.addEnvs(req.body);
+        if (resCode.code == 0) {
+            res.json(resCode);
+            return;
+        } else if (resCode.code == 2) {
+            res.status(500).json(resCode);
+        }
     }
+    res.status(500).json();
 }
 
 async function delEnvs(req, res, next) {

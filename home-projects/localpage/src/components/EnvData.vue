@@ -37,15 +37,17 @@
     </div>
 
     <a-card v-show="showAddEnvTextare" :bodyStyle="{ padding: '10px' }" style="width: 100%">
-      <a-textarea v-model:value="newEnvValue" placeholder="请使用“空格” “,” “=” “#” 分隔键值对" />
+      <a-textarea v-model:value="newEnvValue" style="white-space: pre; overflow: auto;word-wrap: normal;"
+        :autoSize="true" :allowClear="true"
+        placeholder="请使用“空格” “,” “=” “#” 分隔键值对,一行为一个变量。 &#13;&#10;如：pt_key jd_YjNlBptDjNHx 备注&#13;&#10;export RS_PROXY_API='url'" />
       <a-flex :justify="justify" :align="alignItems">
         <a-button style="margin-top: 10px;" type="primary" @click="addNewEnv">保存</a-button>
       </a-flex>
     </a-card>
     <div class="data-item" v-for="env in items" :key="env.id">
       <a-card :bodyStyle="{ padding: '10px' }" style="width: 100%">
-        <a-textarea :disabled="env.disabled" v-model:value="env.value"
-          :placeholder="`请输入 ${env.remarks ? env.remarks + '的' + env.name : ''}`"
+        <a-textarea :allowClear="true" :disabled="env.disabled" v-model:value="env.value"
+          :placeholder="`请输入${env.remarks ? env.remarks + '的' + env.name : ''} ${env.name === 'JD_COOKIE' ? '\r\n请直接输入包含pt_key,pt_pin的字符串，系统会自动解析。' : ''}`"
           :autoSize="env.value ? true : { minRows: 6, maxRows: 8 }" />
 
         <a-flex class="status-info" :justify="justify" :align="alignItems" wrap="wrap">
@@ -62,12 +64,12 @@
           <!-- <a-button type="primary" :loading="env.loading" v-show="!env.disabled"
             @click="updateEnv(env.id)">保存</a-button> -->
 
-          <a-dropdown-button>
-            <span @click="editEnv(env.id)" v-show="env.disabled">更新</span>
-            <span @click="updateEnv(env.id)" v-show="!env.disabled">保存</span>
+          <a-dropdown-button @click="editOrUpdateEnv(env.id, env.disabled ? 0 : 1)">
+            <span v-show="env.disabled">更新</span>
+            <span v-show="!env.disabled">保存</span>
             <template #overlay>
               <a-menu>
-                <a-menu-item key="1" @click="env.disabled = false;">
+                <a-menu-item key="1" @click="editOldValue(env.id)">
                   编辑旧值
                 </a-menu-item>
                 <a-menu-item key="2" v-if="env.name == 'JD_COOKIE'" @click="disableOtherCk(env.id)">
@@ -183,6 +185,7 @@ function getQlEnvsByName(name: string) {
     data.forEach((item: any) => {
       item.disabled = true;
       item.loading = false;
+      item.value0 = item.value;
     });
     items.value = data;
   }).catch(function (error: any) {
@@ -191,11 +194,11 @@ function getQlEnvsByName(name: string) {
 }
 
 // 保存上一次的值
-let temp = '';
+let temp = '10/10';
 const enableCkNums = computed(() => {
-  console.log(activeKey.value);
   if (activeKey.value == 'JD_COOKIE') {
     const enabledCount = items.value.filter(o => o.status === 0).length;
+    console.log("z", enabledCount);
     temp = `(${enabledCount}/${items.value.length})`
     return `(${enabledCount}/${items.value.length})`;
   } else {
@@ -226,28 +229,43 @@ function toggleQlEnvStatus(id: number) {
   });
 }
 
-// 编辑
-function editEnv(id: number) {
-  const itemToUpdate = items.value.find(item => item.id === id);
-  itemToUpdate.value0 = itemToUpdate.value;
-  itemToUpdate.value = "";
-  itemToUpdate.disabled = false;
+function removeQuotes(str: string) {
+  return str.replace(/^['"]+|['"]+$/g, '').trim();
 }
 
 function addNewEnv() {
-  let value = newEnvValue.value;
-  const result = value.split(/[,\s#=]+/).filter(Boolean);;
-  console.log('addNewEnv', result, result.length);
-  if (result.length > 1) {
-    proxy.$api.QL.addEnvs({ name: result[0], value: result[1], remarks: result[2] || '' }).then((response: any) => {
+  let lines = newEnvValue.value.split(/\r?\n/).filter(Boolean);
+  let envArr = [];
+  let vlid = false;
+  for (let i = 0; i < lines.length; i++) {
+    let line = lines[i];
+    console.log(line);
+    const arr = line.split(/[,\s#=]+/).filter(Boolean);
+    if (arr.length < 2 || (line.includes('export') && arr.length < 3)) {
+      vlid = false;
+      break;
+    } else {
+      vlid = true;
+      let index = line.includes('export') ? 1 : 0;
+      let e = { name: removeQuotes(arr[index]), value: removeQuotes(arr[index + 1]), remarks: removeQuotes((arr[index + 2] || '')) };
+      envArr.push(e);
+    }
+  }
+  console.log('addNewEnv', vlid);
+  if (vlid) {
+    proxy.$api.QL.addEnvs(envArr).then((response: any) => {
       console.log(response);
       successMsg(response.data.msg);
       showAddEnvTextare.value = false;
     }).catch(function (error: any) {
-      console.log(error.response.data);
-      errorMsg(error.response.data.msg)
+      // console.log(error.response.data);
+      let data = error.response.data;
+      if (data && data.code == 2) {
+        warningMsg(data.uniqueData.name + '=' + data.uniqueData.value + '该组合已存在。')
+      } else {
+        errorMsg('保存错误')
+      }
     }).finally(() => {
-      errorMsg('保存失败');
     })
   } else {
     warningMsg("变量格式不正确，请检查。")
@@ -265,8 +283,18 @@ function delEnv(id: number) {
     console.log(error.response.data);
     errorMsg(error.response.data.msg)
   }).finally(() => {
-    errorMsg('删除失败');
   })
+}
+
+// 编辑
+function editOrUpdateEnv(id: number, type: number) {
+  if (type == 0) {
+    const itemToUpdate = items.value.find(item => item.id === id);
+    itemToUpdate.value = "";
+    itemToUpdate.disabled = false;
+  } else if (type == 1) {
+    updateEnv(id)
+  }
 }
 
 //更新
@@ -303,6 +331,15 @@ function updateEnv(id: number) {
   }
 }
 
+// 编辑旧值
+function editOldValue(id: number) {
+  const itemToUpdate = items.value.find(item => item.id === id);
+  if (itemToUpdate.value0) {
+    itemToUpdate.value = itemToUpdate.value0;
+  }
+  itemToUpdate.disabled = false;
+}
+
 //禁用其他ck
 function disableOtherCk(id: number) {
   proxy.$api.QL.disableOtherCK({ id: id }).then((response: any) => {
@@ -324,7 +361,6 @@ function disableOtherCk(id: number) {
 // --------------- 顶部菜单-----------------
 // tab1 切换回调
 function tab1change() {
-  console.log(activeKey.value);
   getQlEnvsByName(activeKey.value);
   //清空log
   wslog.value = '';
